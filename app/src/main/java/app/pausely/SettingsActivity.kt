@@ -12,7 +12,7 @@ class SettingsActivity : Activity() {
         val c = screen("Settings")
         c.addView(card(tv("Default daily limit", 16f, C.TEXT, true),
             tv("${Prefs.defaultLimit(this)} min per app. Apps can override it with their own limit (tap an app card).").apply { setPadding(0, dp(6), 0, 0) },
-            btn("Change default", false) { askDefault() }))
+            btn("Change default", false) { changeDefaultLimit { render() } }))
         c.addView(card(sw("Pause screen before opening", Prefs.pauseOn(this)) { on ->
             if (on) { Prefs.setPause(this, true); render() } else { render(); puzzle { Prefs.setPause(this, false); render() } } },
             tv("A 5-second breather before a limited app opens.").apply { setPadding(0, dp(6), 0, 0) }))
@@ -34,18 +34,10 @@ class SettingsActivity : Activity() {
             hrow(btn("LinkedIn", false) { open(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.linkedin.com/in/srikrishnaayyanki/"))) },
                 btn("GitHub", false) { open(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/sri347"))) },
                 btn("Email", false) { open(Intent(Intent.ACTION_SENDTO, android.net.Uri.parse("mailto:srikrishna.ayyanki@gmail.com")).putExtra(Intent.EXTRA_SUBJECT, "Pausely feedback")) })))
-        c.addView(tv("Pausely 1.3", 12f).apply { setPadding(0, dp(16), 0, 0) })
+        c.addView(tv("Pausely 1.4", 12f).apply { setPadding(0, dp(16), 0, 0) })
     }
 
     private fun open(i: Intent) { try { startActivity(i) } catch (e: Exception) { Toast.makeText(this, "No app found to open this", Toast.LENGTH_SHORT).show() } }
-
-    private fun askDefault() {
-        val et = EditText(this).apply { hint = "minutes per day"; inputType = android.text.InputType.TYPE_CLASS_NUMBER; setTextColor(C.TEXT); setHintTextColor(C.MUTED) }
-        AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert).setTitle("Default daily limit (min)").setView(et).setPositiveButton("Save") { _, _ ->
-            val m = et.text.toString().toIntOrNull()?.takeIf { it in 1..1440 } ?: return@setPositiveButton
-            if (m <= Prefs.defaultLimit(this)) { Prefs.setDefaultLimit(this, m); render() } else puzzle { Prefs.setDefaultLimit(this, m); render() }
-        }.show()
-    }
 
     @Deprecated("") override fun onActivityResult(req: Int, res: Int, data: Intent?) {
         val u = data?.data ?: return

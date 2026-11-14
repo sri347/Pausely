@@ -27,6 +27,7 @@ class MainActivity : Activity() {
             contentDescription = "${used / 60000} minutes used today of ${lim / 60000}"
             layoutParams = LinearLayout.LayoutParams(dp(220), dp(220)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(20); bottomMargin = dp(20) }
         })
+        c.addView(chip("⏱  Default limit: ${Prefs.defaultLimit(this)} min per app  ·  tap to change", C.TEXT) { changeDefaultLimit { render() } })
         val on = serviceOn()
         c.addView(chip(if (on) "● Protection ON" else "● Protection OFF - tap to fix", if (on) C.GREEN else C.RED) {
             startActivity(if (on) Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS) else Intent(this, GuideActivity::class.java))
@@ -73,7 +74,7 @@ class MainActivity : Activity() {
         val items = mutableListOf("Change limit"); if (Prefs.hasCustom(this, p)) items.add("Use default limit (${Prefs.defaultLimit(this)} min)"); items.add("Schedule…"); if (!Prefs.emgToday(this)) items.add("Emergency +5 min (once a day)"); items.add("Remove app")
         dlg().setTitle(label(p)).setItems(items.toTypedArray()) { _, i ->
             when (items[i]) {
-                "Change limit" -> askLimit(p)
+                "Change limit" -> changeAppLimit(p) { render() }
                 "Schedule…" -> startActivity(Intent(this, SchedulesActivity::class.java).putExtra("pkg", p))
                 items.firstOrNull { it.startsWith("Use default") } -> {
                     val d = Prefs.defaultLimit(this)
@@ -94,14 +95,6 @@ class MainActivity : Activity() {
             if (!d.isShowing) return
             left--; if (left > 0) { d.setMessage("Unlocking in $left s"); h.postDelayed(this, 1000) } else { d.setMessage("Ready."); b.isEnabled = true }
         } }, 1000)
-    }
-
-    private fun askLimit(p: String) {
-        val et = EditText(this).apply { hint = "minutes per day"; inputType = InputType.TYPE_CLASS_NUMBER; setTextColor(C.TEXT); setHintTextColor(C.MUTED) }
-        dlg().setTitle("Daily limit (min)").setView(et).setPositiveButton("Save") { _, _ ->
-            val m = et.text.toString().toIntOrNull()?.takeIf { it in 1..1440 } ?: return@setPositiveButton
-            if (m <= Prefs.limitMin(this, p)) { Prefs.setLimit(this, p, m); render() } else puzzle { Prefs.setLimit(this, p, m); render() }
-        }.show()
     }
 
     private fun pickApps() {
