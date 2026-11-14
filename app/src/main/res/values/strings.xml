@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">Pausely</string>
+    <string name="service_desc">Detects which app is open so Pausely can show its pause and limit screens. It does not read screen content and nothing leaves your phone.</string>
+</resources>
