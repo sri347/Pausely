@@ -43,3 +43,6 @@ Built by **Sri Krishna Ayyanki**
 - GitHub: https://github.com/sri347
 - LinkedIn: https://www.linkedin.com/in/srikrishnaayyanki/
 - Email: srikrishna.ayyanki@gmail.com
+
+## License
+GPL-3.0. See [LICENSE](LICENSE). Copyright (C) 2026 Sri Krishna Ayyanki.
