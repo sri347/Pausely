@@ -14,6 +14,7 @@ object C {
     const val FIELD = 0xFF2C313B.toInt(); const val ACCENT = 0xFF7C5CFF.toInt(); const val GREEN = 0xFF3DDC84.toInt()
     const val RED = 0xFFFF5C5C.toInt(); const val TEXT = 0xFFFFFFFF.toInt(); const val MUTED = 0xFF9AA0AA.toInt()
 }
+fun Context.s(id: Int, vararg a: Any): String = getString(id, *a)
 fun Context.dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 fun roundBg(color: Int, r: Float = 40f) = GradientDrawable().apply { setColor(color); cornerRadius = r }
 fun Context.label(p: String) = try { packageManager.getApplicationLabel(packageManager.getApplicationInfo(p, 0)).toString() } catch (_: Exception) { p }
@@ -51,11 +52,15 @@ fun View.fitSystem(h: Int, v: Int) {
     }
 }
 
+fun View.pane(title: String) { if (Build.VERSION.SDK_INT >= 28) accessibilityPaneTitle = title }
+
 /** Standard dark scrolling screen; returns the column to add views to. */
 fun Activity.screen(title: String, sub: String? = null): LinearLayout {
     val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(24), dp(20), dp(32)); fitSystem(dp(20), dp(24)) }
     col.addView(tv(title, 28f, C.TEXT, true)); if (sub != null) col.addView(tv(sub))
-    setContentView(ScrollView(this).apply { setBackgroundColor(C.BG); isFillViewport = true; addView(col) })
+    val oldY = (findViewById<android.view.ViewGroup>(android.R.id.content)?.getChildAt(0) as? ScrollView)?.scrollY ?: 0
+    val sv = ScrollView(this).apply { setBackgroundColor(C.BG); isFillViewport = true; addView(col) }
+    setContentView(sv); if (oldY > 0) sv.post { sv.scrollTo(0, oldY) }
     return col
 }
 
@@ -88,7 +93,7 @@ class Bars(c: Context) : View(c) {
             val h = (bot - top) * v / max; val x = i * slot + slot * 0.15f
             p.color = C.ACCENT; cv.drawRoundRect(x, bot - h, i * slot + slot * 0.85f, bot, 8f, 8f, p)
             if (i % step == 0) { t.color = C.MUTED; cv.drawText(labels[i], i * slot + slot / 2, height - context.dp(4).toFloat(), t) }
-            if (v > 0 && n <= 7) { t.color = C.TEXT; cv.drawText("${v / 60000}m", i * slot + slot / 2, bot - h - context.dp(4), t) }
+            if (v > 0 && n <= 7) { t.color = C.TEXT; cv.drawText(context.s(R.string.minutes_short, (v / 60000).toInt()), i * slot + slot / 2, bot - h - context.dp(4), t) }
         }
     }
 }

@@ -1,6 +1,8 @@
 package app.pausely
 
 import android.content.Context
+import android.os.SystemClock
+import android.provider.Settings
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -15,9 +17,36 @@ object Prefs {
     private const val EMERGENCY_MS = 5 * 60_000L
     private fun sp(c: Context) = c.getSharedPreferences("pausely", Context.MODE_PRIVATE)
 
+    // ---- trusted clock: ignores big forward jumps of the phone clock within one boot ----
+    fun nowMs(c: Context): Long {
+        val wall = System.currentTimeMillis(); val el = SystemClock.elapsedRealtime()
+        val boot = Settings.Global.getInt(c.contentResolver, Settings.Global.BOOT_COUNT, -1)
+        val s = sp(c)
+        val bw = s.getLong("tw_wall", 0); val be = s.getLong("tw_el", 0)
+        if (s.getInt("tw_boot", -2) == boot && el >= be) {
+            val est = bw + (el - be)
+            if (Math.abs(wall - est) > 30 * 60_000L) {                      // clock moved >30 min either way: ignore it...
+                var bad = s.getLong("tw_bad", 0)
+                if (bad == 0L) { bad = el; s.edit().putLong("tw_bad", el).apply() }
+                if (el - bad < 24 * 3_600_000L) return est
+                s.edit().putLong("tw_wall", wall).putLong("tw_el", el).putLong("tw_bad", 0).apply() // ...unless it persists a full day (legit correction)
+                return wall
+            }
+            if (s.getLong("tw_bad", 0) != 0L) s.edit().putLong("tw_bad", 0).apply()
+            if (el - be > 60_000L) s.edit().putLong("tw_wall", wall).putLong("tw_el", el).apply()
+            return wall
+        }
+        s.edit().putInt("tw_boot", boot).putLong("tw_wall", wall).putLong("tw_el", el).putLong("tw_bad", 0).apply()
+        return wall
+    }
+    // when we last saw a limited app leave the foreground (survives service restarts)
+    fun markExit(c: Context, p: String) = sp(c).edit().putLong("exit_$p", nowMs(c)).apply()
+    fun exitAt(c: Context, p: String) = sp(c).getLong("exit_$p", 0)
+    private fun cal(c: Context): Calendar = Calendar.getInstance().apply { timeInMillis = nowMs(c) }
+
     // ---- day (never moves backwards, so changing the phone clock can't reset usage) ----
     fun today(c: Context): String {
-        val w = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        val w = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(nowMs(c)))
         val m = sp(c).getString("maxDay", "")!!
         if (w <= m) return m
         val e = sp(c).edit().putString("maxDay", w)
@@ -44,7 +73,7 @@ object Prefs {
         e.apply()
     }
     fun defaultLimit(c: Context) = sp(c).getInt("default_limit", 10)
-    fun setDefaultLimit(c: Context, m: Int) = sp(c).edit().putInt("default_limit", m).apply()
+    fun setDefaultLimit(c: Context, m: Int) = sp(c).edit().putInt("default_limit", m).putString("red_start", today(c)).apply() // restarts the reduction clock for default-following apps
     fun hasCustom(c: Context, p: String) = sp(c).contains("limit_$p")
     fun clearLimit(c: Context, p: String) = sp(c).edit().remove("limit_$p").remove("anchor_$p").apply()
     fun limitBase(c: Context, p: String) = sp(c).getInt("limit_$p", defaultLimit(c))
@@ -65,7 +94,7 @@ object Prefs {
 
     // ---- usage / opens history (30 days) ----
     fun usedMs(c: Context, p: String, day: String = today(c)) = sp(c).getLong("u_${day}_$p", 0)
-    fun addMs(c: Context, p: String, ms: Long) { val d = today(c); sp(c).edit().putLong("u_${d}_$p", usedMs(c, p, d) + ms).apply() }
+    fun addMs(c: Context, p: String, ms: Long, day: String = today(c)) { val d = day; sp(c).edit().putLong("u_${d}_$p", usedMs(c, p, d) + ms).apply() }
     fun opens(c: Context, p: String, day: String = today(c)) = sp(c).getInt("o_${day}_$p", 0)
     fun addOpen(c: Context, p: String) { val d = today(c); sp(c).edit().putInt("o_${d}_$p", opens(c, p, d) + 1).apply() }
     fun days(c: Context, n: Int): List<String> { val t = LocalDate.parse(today(c)); return (n - 1 downTo 0).map { t.minusDays(it.toLong()).toString() } }
@@ -92,35 +121,35 @@ object Prefs {
         return if (w.s < w.e) m >= w.s && m < w.e && has(w, t) else (m >= w.s && has(w, t)) || (m < w.e && has(w, y))
     }
     private fun wins(c: Context, p: String) = listOf(win(c, "g"), win(c, p))
-    fun blockedUntilMin(c: Context, p: String): Int? { val k = Calendar.getInstance(); return wins(c, p).firstOrNull { inWin(k, it) }?.e }
+    fun blockedUntilMin(c: Context, p: String): Int? { val k = cal(c); return wins(c, p).firstOrNull { inWin(k, it) }?.e }
     fun msToNextStart(c: Context, p: String): Long? {
-        val now = System.currentTimeMillis(); val k = Calendar.getInstance()
+        val now = nowMs(c); val k = cal(c)
         return wins(c, p).filter { it.on && it.s != it.e && it.days != 0 && !inWin(k, it) }.mapNotNull { w ->
             (0..7).firstNotNullOfOrNull { d ->
-                val x = Calendar.getInstance(); x.add(Calendar.DAY_OF_YEAR, d)
+                val x = cal(c); x.add(Calendar.DAY_OF_YEAR, d)
                 x[Calendar.HOUR_OF_DAY] = w.s / 60; x[Calendar.MINUTE] = w.s % 60; x[Calendar.SECOND] = 0; x[Calendar.MILLISECOND] = 0
                 if (has(w, dayIdx(x)) && x.timeInMillis > now) x.timeInMillis - now else null
             }
         }.minOrNull()
     }
     fun msToWinEnd(c: Context, p: String): Long? {
-        val now = System.currentTimeMillis(); val k = Calendar.getInstance(); val m = k[Calendar.HOUR_OF_DAY] * 60 + k[Calendar.MINUTE]
+        val now = nowMs(c); val k = cal(c); val m = k[Calendar.HOUR_OF_DAY] * 60 + k[Calendar.MINUTE]
         return wins(c, p).filter { inWin(k, it) }.map { w ->
-            val x = Calendar.getInstance(); if (w.s > w.e && m >= w.s) x.add(Calendar.DAY_OF_YEAR, 1)
+            val x = cal(c); if (w.s > w.e && m >= w.s) x.add(Calendar.DAY_OF_YEAR, 1)
             x[Calendar.HOUR_OF_DAY] = w.e / 60; x[Calendar.MINUTE] = w.e % 60; x[Calendar.SECOND] = 0; x[Calendar.MILLISECOND] = 0
             x.timeInMillis - now
         }.minOrNull()
     }
-    fun msToMidnight(): Long { val k = Calendar.getInstance(); k.add(Calendar.DAY_OF_YEAR, 1)
+    fun msToMidnight(c: Context): Long { val k = cal(c); k.add(Calendar.DAY_OF_YEAR, 1)
         k[Calendar.HOUR_OF_DAY] = 0; k[Calendar.MINUTE] = 0; k[Calendar.SECOND] = 0; k[Calendar.MILLISECOND] = 0
-        return k.timeInMillis - System.currentTimeMillis() }
-    fun fmt(min: Int): String { val k = Calendar.getInstance(); k[Calendar.HOUR_OF_DAY] = min / 60; k[Calendar.MINUTE] = min % 60
-        return SimpleDateFormat("h:mm a", Locale.getDefault()).format(k.time) }
-    fun daysLabel(d: Int): String {
-        val n = listOf("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
-        return when (d) { 127 -> "Every day"; 31 -> "Mon–Fri"; 96 -> "Sat–Sun"; 0 -> "No days"; else -> n.filterIndexed { i, _ -> (d shr i) and 1 == 1 }.joinToString(" ") }
+        return k.timeInMillis - nowMs(c) }
+    fun fmt(c: Context, min: Int): String { val k = Calendar.getInstance(); k[Calendar.HOUR_OF_DAY] = min / 60; k[Calendar.MINUTE] = min % 60
+        return android.text.format.DateFormat.getTimeFormat(c).format(k.time) }
+    fun daysLabel(c: Context, d: Int): String = when (d) {
+        127 -> c.s(R.string.every_day); 31 -> c.s(R.string.weekdays); 96 -> c.s(R.string.weekend); 0 -> c.s(R.string.no_days)
+        else -> (0..6).filter { (d shr it) and 1 == 1 }.joinToString(" ") { java.time.DayOfWeek.of(it + 1).getDisplayName(java.time.format.TextStyle.SHORT, Locale.getDefault()) }
     }
-    fun summary(w: Win) = "${fmt(w.s)} – ${fmt(w.e)} · ${daysLabel(w.days)}"
+    fun summary(c: Context, w: Win) = "${fmt(c, w.s)} – ${fmt(c, w.e)} · ${daysLabel(c, w.days)}"
 
     // ---- crash recovery for a running session ----
     fun setRec(c: Context, p: String) = sp(c).edit().putString("rec_pkg", p).putLong("rec_at", System.currentTimeMillis()).apply()
@@ -151,8 +180,9 @@ object Prefs {
         val pk = (0 until a.length()).map { a.getString(it) }
         pk.forEach { require(Regex("[A-Za-z0-9._]{1,200}").matches(it)); require(l.optInt(it, 1) in 1..1440); jwin(s.getJSONObject(it)) }
         val df = o.optInt("default", 10); require(df in 1..1440)
+        val ps = o.getBoolean("pause"); val rd = o.getBoolean("reduction")
         val g = jwin(o.getJSONObject("global"))
         setDefaultLimit(c, df); setApps(c, pk.toSet()); pk.forEach { if (l.has(it)) setLimit(c, it, l.getInt(it)) else clearLimit(c, it); setWin(c, it, jwin(s.getJSONObject(it))) }
-        setWin(c, "g", g); setPause(c, o.getBoolean("pause")); setRed(c, o.getBoolean("reduction")); true
+        setWin(c, "g", g); setPause(c, ps); setRed(c, rd); true
     } catch (e: Exception) { false }
 }

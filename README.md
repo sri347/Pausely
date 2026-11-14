@@ -12,6 +12,8 @@ Android app that limits time in apps like Instagram and X. Native Kotlin, no dep
 - Emergency unlock: once a day, +5 min, puzzle plus 30 s wait
 - Quick panel from Android's floating accessibility button: usage, -5 min, toggles
 - 30-day stats, settings export/import, in-app setup guide
+- Loud in-app banner when protection (the accessibility service) is switched off
+- Screen-reader labels, all text in string resources, 12/24-hour aware times
 
 ## How it works
 An Accessibility service detects the foreground app (`TYPE_WINDOW_STATE_CHANGED` only; it cannot read screen content) and shows overlays. Usage is timed with a single timer per session, with no polling. Everything stays on the device; the app has no internet permission. See [PRIVACY.md](PRIVACY.md).

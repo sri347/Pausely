@@ -1,4 +1,188 @@
 <resources>
     <string name="app_name">Pausely</string>
     <string name="service_desc">Detects which app is open so Pausely can show its pause and limit screens. It does not read screen content and nothing leaves your phone.</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="add">Add</string>
+    <string name="close">Close</string>
+    <string name="on">ON</string>
+    <string name="off">OFF</string>
+    <string name="pane_block">Time limit reached</string>
+    <string name="pane_nudge">Pause before opening</string>
+    <string name="pane_panel">Pausely quick panel</string>
+    <string name="off_until">%1$s is off-limits until %2$s.</string>
+    <string name="used_limit">You\'ve used your %1$d min of %2$s today.\nCome back tomorrow.</string>
+    <string name="btn_home">Fine, take me home</string>
+    <string name="nudge_used">Used today: %1$dm of %2$dm   ·   Opens: %3$d</string>
+    <string name="continue_in">Continue in %1$d</string>
+    <string name="continue_now">Continue</string>
+    <string name="never_mind">Never mind</string>
+    <string name="panel_title">Pausely · today</string>
+    <string name="protection_on">Protection ON</string>
+    <string name="panel_used">%1$dm of %2$dm · %3$d opens</string>
+    <string name="minus5">−5 min</string>
+    <string name="minus5_desc">Lower the limit for %1$s by 5 minutes</string>
+    <string name="toggle_pause">Pause screen</string>
+    <string name="toggle_red">Reduction</string>
+    <string name="toggle_fmt">%1$s: %2$s</string>
+    <string name="needs_puzzle">Turning off needs a puzzle</string>
+    <string name="open_pausely">Open Pausely</string>
+    <string name="tagline">Scroll less. Live more.</string>
+    <string name="used_today">used today</string>
+    <string name="ring_desc">%1$d minutes used today of %2$d</string>
+    <string name="default_chip">⏱  Default limit: %1$d min per app  ·  tap to change</string>
+    <string name="prot_on">● Protection ON</string>
+    <string name="prot_off">● Protection OFF - tap to fix</string>
+    <string name="stats">Stats</string>
+    <string name="schedules">Schedules</string>
+    <string name="settings">Settings</string>
+    <string name="limited_apps">Limited apps</string>
+    <string name="add_app">+ Add app</string>
+    <string name="card_line">%1$dm %2$ds of %3$dm%4$s · %5$d opens</string>
+    <string name="tag_default"> (default)</string>
+    <string name="tag_shrinking"> ↓ shrinking</string>
+    <string name="bedtime_line">🌙 Bedtime %1$s</string>
+    <string name="moon_line">🌙 %1$s</string>
+    <string name="no_apps">No apps yet. Tap + Add app.</string>
+    <string name="consent_title">Before you start</string>
+    <string name="consent_head">How Pausely works</string>
+    <string name="consent_body">• Uses Android\'s Accessibility service only to detect which app is open and to show its pause and block screens.\n• Does not read what is on your screen, your messages or passwords.\n• Nothing leaves your phone. The app has no internet permission.\n• You can turn it off any time in Settings → Accessibility.</string>
+    <string name="consent_yes">I understand and agree</string>
+    <string name="consent_no">No thanks</string>
+    <string name="opt_change">Change limit</string>
+    <string name="opt_default">Use default limit (%1$d min)</string>
+    <string name="opt_schedule">Schedule…</string>
+    <string name="opt_emergency">Emergency +5 min (once a day)</string>
+    <string name="opt_remove">Remove app</string>
+    <string name="hold_on">Hold on…</string>
+    <string name="unlocking_in">Unlocking in %1$d s</string>
+    <string name="unlock_btn">Unlock +5 min</string>
+    <string name="ready">Ready.</string>
+    <string name="add_apps_title">Add apps to limit</string>
+    <string name="minutes_per_day">minutes per day</string>
+    <string name="quick_pick">Quick pick</string>
+    <string name="default_title">Default daily limit</string>
+    <string name="minutes_desc">%1$d minutes</string>
+    <string name="puzzle_title">Prove you\'re sure</string>
+    <string name="too_many">Too many fails. Try again in %1$d min.</string>
+    <string name="locked">3 fails. Locked for 10 minutes.</string>
+    <string name="wrong">Wrong. Try again.</string>
+    <string name="check">Check</string>
+    <string name="math_q">(%1$d/3)   %2$d × %3$d − %4$d</string>
+    <string name="watch">Watch the pattern…</string>
+    <string name="your_turn">Your turn: repeat it</string>
+    <string name="stroop_info">Tap the COLOR of the word, not what it says  (%1$d/5)</string>
+    <string name="c_red">RED</string>
+    <string name="c_green">GREEN</string>
+    <string name="c_blue">BLUE</string>
+    <string name="c_yellow">YELLOW</string>
+    <string name="default_desc">%1$d min per app. Apps can override it with their own limit (tap an app card).</string>
+    <string name="change_default">Change default</string>
+    <string name="pause_title">Pause screen before opening</string>
+    <string name="pause_desc">A 5-second breather before a limited app opens.</string>
+    <string name="red_title">Gradual reduction</string>
+    <string name="red_desc">Every limit shrinks by 1 min per week, down to a floor of 5 min.</string>
+    <string name="export">Export settings</string>
+    <string name="import_">Import settings</string>
+    <string name="guide">Setup guide</string>
+    <string name="privacy">Privacy</string>
+    <string name="privacy_body">Pausely runs entirely on your phone. It has no internet permission and sends nothing anywhere.\n\nIt uses the Accessibility service only to learn which app is in the foreground, so it can time your use and show pause/block screens. It does not read screen content, messages or passwords.\n\nIt requests no permissions at all.\n\nStored locally: your app list, limits, schedules and 30 days of per-app usage minutes and open counts. Uninstalling removes it.\n\nQuestions: srikrishna.ayyanki@gmail.com</string>
+    <string name="about_title">About the developer</string>
+    <string name="about_body">Built by Sri Krishna Ayyanki\nsrikrishna.ayyanki@gmail.com</string>
+    <string name="linkedin">LinkedIn</string>
+    <string name="github">GitHub</string>
+    <string name="email">Email</string>
+    <string name="email_subject">Pausely feedback</string>
+    <string name="no_app">No app found to open this</string>
+    <string name="exported">Exported</string>
+    <string name="imported">Imported</string>
+    <string name="invalid_file">Invalid settings file</string>
+    <string name="file_error">Could not read or write the file</string>
+    <string name="version_fmt">Pausely %1$s</string>
+    <string name="schedule_one">Schedule: %1$s</string>
+    <string name="schedules_sub">Block apps completely during these hours. Changing a schedule needs a puzzle.</string>
+    <string name="bedtime_all">Bedtime (all limited apps)</string>
+    <string name="bedtime_this">Bedtime (applies to all apps)</string>
+    <string name="blocked_fmt">Blocked %1$s</string>
+    <string name="off_fmt">Off · %1$s</string>
+    <string name="from_fmt">From %1$s</string>
+    <string name="to_fmt">To %1$s</string>
+    <string name="days">Days</string>
+    <string name="day_desc">%1$s, %2$s</string>
+    <string name="selected">selected</string>
+    <string name="not_selected">not selected</string>
+    <string name="every_day">Every day</string>
+    <string name="weekdays">Mon–Fri</string>
+    <string name="weekend">Sat–Sun</string>
+    <string name="no_days">No days</string>
+    <string name="stats_sub">Last %1$d days, stored only on this phone.</string>
+    <string name="total_chart">Total minutes per day</string>
+    <string name="show30">Show 30 days</string>
+    <string name="show7">Show 7 days</string>
+    <string name="by_app">By app</string>
+    <string name="no_usage">No usage recorded yet.</string>
+    <string name="stats_line">%1$d min total · %2$d min/day avg · %3$d opens</string>
+    <string name="chart_desc">Daily usage chart: %1$s</string>
+    <string name="minutes_short">%1$dm</string>
+    <string name="guide_title">How to set up</string>
+    <string name="guide_sub">Do this once. About 2 minutes.</string>
+    <string name="open_app_info">Open App info</string>
+    <string name="open_acc">Open Accessibility settings</string>
+    <string-array name="block_messages">
+        <item>🦥|Your thumb called. It wants a day off.</item>
+        <item>🚪|%s has left the building. So should you.</item>
+        <item>💧|Go drink some water. Your future self says thanks.</item>
+        <item>🐢|Even a turtle has scrolled enough for today.</item>
+        <item>🌳|Touch grass. It\'s free and has no ads.</item>
+        <item>📵|Plot twist: the feed is infinite, you are not.</item>
+        <item>🧠|Your brain cells filed a formal complaint.</item>
+        <item>🎬|That reel will still be there tomorrow. Probably worse.</item>
+        <item>🌅|Look up. The sky has better content.</item>
+        <item>☕|Make a chai. Stare at a wall. It\'s underrated.</item>
+        <item>🏃|Go for a 5-min walk. Steps &gt; scrolls.</item>
+        <item>🔒|Access denied. The algorithm will survive without you.</item>
+        <item>📖|You could\'ve read 10 pages by now. Just saying.</item>
+        <item>😴|Proud of you for stopping. Now actually stop.</item>
+        <item>🤝|Text a real friend instead. They\'d love it.</item>
+        <item>🎯|Time\'s up. Your goals miss you.</item>
+        <item>🍿|No more snacks from %s today. Kitchen\'s closed.</item>
+        <item>🧘|Deep breath. Notifications can wait.</item>
+        <item>🚀|Use this time to build something. You\'re good at it.</item>
+        <item>🙈|Nothing to see here. Literally. Go home.</item>
+    </string-array>
+    <string-array name="nudge_messages">
+        <item>🤔|Quick breather. Do you really want %s?</item>
+        <item>🫖|Take a sip of water first. Then decide.</item>
+        <item>🧐|Opening %s on autopilot? Caught you.</item>
+        <item>⏳|Five seconds. That\'s all we ask.</item>
+        <item>🎈|Pause. What were you about to do before this?</item>
+        <item>🐌|Slow down. %s isn\'t going anywhere.</item>
+        <item>🧠|Your future self is watching. Still opening %s?</item>
+        <item>🌬️|Inhale. Exhale. Now, still want it?</item>
+    </string-array>
+    <string-array name="guide_titles">
+        <item>1. Install the APK</item>
+        <item>2. Play Protect says \"App blocked\"</item>
+        <item>3. Allow restricted settings</item>
+        <item>4. Turn on the service</item>
+        <item>5. Choose apps and limits</item>
+        <item>6. Emergency unlock</item>
+        <item>7. Keep it alive / save battery</item>
+        <item>8. The floating shortcut</item>
+        <item>Troubleshooting</item>
+    </string-array>
+    <string-array name="guide_bodies">
+        <item>Open the APK from Files/Drive. If Android asks, allow \"Install unknown apps\" for that app.</item>
+        <item>Play Store → profile icon → Play Protect → ⚙ → turn OFF \"Scan apps with Play Protect\" (or pause it). Install the APK, then you can turn it back on. If it blocks again later, repeat.</item>
+        <item>Android greys out accessibility for sideloaded apps. Tap \"Open App info\" below → ⋮ (top right) → \"Allow restricted settings\" → confirm PIN/fingerprint.</item>
+        <item>Settings → Accessibility → Downloaded apps → Pausely → ON → Allow. It only detects which app is in front. Nothing is recorded off-device and the app has no internet permission.</item>
+        <item>Set a default limit in Settings. On the home screen tap + Add app; tap an app card to give it its own limit or a schedule. Raising a limit, removing an app or loosening a schedule needs a puzzle on purpose. Lowering is free.</item>
+        <item>Tap an app card → Emergency +5 min. Once a day, shared by all apps, puzzle + 30 s wait. It does not lift schedule blocks.</item>
+        <item>Settings → Apps → Pausely → Battery → Unrestricted. Some phones (Xiaomi, Oppo, Vivo, OnePlus) otherwise kill the service; also allow Autostart there. Pausely uses no background polling.</item>
+        <item>After you enable Pausely, Android 13+ may show a small floating accessibility button. Tap it for a quick panel: today\'s usage, −5 min on any limit, pause-screen and reduction toggles. To hide it: Settings → Accessibility → Accessibility button (or Pausely → Shortcut) → off.</item>
+        <item>• Counter stays 0: service is off or restricted (steps 3-4).\n• Stopped working after an update: toggle the service off and on.\n• Install updates over the old version; don\'t uninstall, or you lose usage data.\n• Daily usage resets at midnight.</item>
+    </string-array>
+    <string name="banner_off_title">Protection is OFF</string>
+    <string name="banner_off_text">Pausely can\'t limit anything until you turn it on. Tap here to fix it.</string>
 </resources>
