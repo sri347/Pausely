@@ -22,7 +22,9 @@ class SchedulesActivity : Activity() {
         fun pick(isStart: Boolean) = puzzle {
             val m = if (isStart) w.s else w.e
             TimePickerDialog(this, android.R.style.Theme_Material_Dialog_Alert, { _, hh, mm ->
-                val v = hh * 60 + mm; save(Win(w.on, if (isStart) v else w.s, if (isStart) w.e else v, w.days))
+                val v = hh * 60 + mm
+                if (v == (if (isStart) w.e else w.s)) Toast.makeText(this, s(R.string.same_time), Toast.LENGTH_SHORT).show()
+                else save(Win(w.on, if (isStart) v else w.s, if (isStart) w.e else v, w.days))
             }, m / 60, m % 60, android.text.format.DateFormat.is24HourFormat(this)).show()
         }
         val days = hrow(*(0..6).map { i ->

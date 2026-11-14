@@ -3,6 +3,7 @@ package app.pausely
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.view.View
 import android.widget.*
 
 class SettingsActivity : Activity() {
@@ -10,7 +11,7 @@ class SettingsActivity : Activity() {
     private fun render() {
         val c = screen(s(R.string.settings))
         c.addView(card(tv(s(R.string.default_title), 16f, C.TEXT, true),
-            tv(s(R.string.default_desc, Prefs.defaultLimit(this))).apply { setPadding(0, dp(6), 0, 0) },
+            tv(s(R.string.default_desc, Prefs.defaultEffective(this))).apply { setPadding(0, dp(6), 0, 0) },
             btn(s(R.string.change_default), false) { changeDefaultLimit { render() } }))
         c.addView(card(sw(s(R.string.pause_title), Prefs.pauseOn(this)) { on ->
             if (on) { Prefs.setPause(this, true); render() } else { render(); puzzle { Prefs.setPause(this, false); render() } } },
@@ -24,6 +25,7 @@ class SettingsActivity : Activity() {
         c.addView(btn(s(R.string.guide), false) { startActivity(Intent(this, GuideActivity::class.java)) })
         c.addView(btn(s(R.string.privacy), false) { AlertDialog.Builder(this, android.R.style.Theme_Material_Dialog_Alert)
             .setTitle(s(R.string.privacy)).setMessage(s(R.string.privacy_body)).setPositiveButton(s(R.string.ok), null).show() })
+        c.addView(View(this).apply { minimumHeight = dp(16) }, LinearLayout.LayoutParams(-1, 0, 1f)) // pushes the footer to the bottom
         c.addView(card(tv(s(R.string.about_title), 16f, C.TEXT, true),
             tv(s(R.string.about_body)).apply { setPadding(0, dp(6), 0, 0) },
             hrow(btn(s(R.string.linkedin), false) { open(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://www.linkedin.com/in/srikrishnaayyanki/"))) },

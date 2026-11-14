@@ -22,7 +22,7 @@ fun Activity.limitPicker(title: String, current: Int, onSave: (Int) -> Unit) {
     col.addView(hrow(btn("−5", false) { step(-5) }, btn("−1", false) { step(-1) }, btn("+1", false) { step(1) }, btn("+5", false) { step(5) }))
     col.addView(tv(s(R.string.quick_pick), 12f).apply { setPadding(0, dp(14), 0, 0) })
     col.addView(hrow(*pBtns.toTypedArray()))
-    col.addView(btn(s(R.string.save)) { d.dismiss(); onSave(v) })
+    col.addView(btn(s(R.string.save)) { if (d.isShowing) { d.dismiss(); onSave(v) } })
     col.addView(btn(s(R.string.cancel), false) { d.dismiss() })
     paint()
     d.setContentView(ScrollView(this).apply { addView(col) })
@@ -31,10 +31,9 @@ fun Activity.limitPicker(title: String, current: Int, onSave: (Int) -> Unit) {
     d.show()
 }
 
-fun Activity.changeDefaultLimit(after: () -> Unit) = limitPicker(s(R.string.default_title), Prefs.defaultLimit(this)) { m ->
-    if (m == Prefs.defaultLimit(this)) return@limitPicker
-    val apply = { Prefs.setDefaultLimit(this, m); after() }
-    if (m <= Prefs.defaultLimit(this)) apply() else puzzle(apply)
+fun Activity.changeDefaultLimit(after: () -> Unit) = limitPicker(s(R.string.default_title), Prefs.defaultEffective(this)) { m ->
+    if (m == Prefs.defaultEffective(this)) return@limitPicker
+    puzzle { Prefs.setDefaultLimit(this, m); after() }   // the default affects every app, so any change needs a puzzle
 }
 
 fun Activity.changeAppLimit(p: String, after: () -> Unit) = limitPicker(label(p), Prefs.limitMin(this, p)) { m ->

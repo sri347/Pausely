@@ -22,6 +22,9 @@ class LimiterService : AccessibilityService() {
     private var overlay: View? = null
     private var panel: View? = null
     private var focusReq: AudioFocusRequest? = null
+    private class Undo(val p: String, val custom: Boolean, val base: Int, val anchor: String?, val at: Long)
+    private var undo: Undo? = null          // last quick-panel -5, undoable for 10 s
+    private var sessionStartWall = 0L
     private var sessionDay = ""             // day a running session started on (midnight-safe accounting)
     private var registered = false
     private var ovKind: String? = null
@@ -31,13 +34,13 @@ class LimiterService : AccessibilityService() {
         "com.android.permissioncontroller", "com.android.intentresolver")
     private val GRACE = 2 * 60_000L     // re-entering within 2 min is the same "sitting"
 
-    private val tick = Runnable { commit(); enter(pkg, true) }
+    private val tick = Runnable { commit("limit"); enter(pkg, true) }
     private val recheck = Runnable { enter(pkg, true) }
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
             if (i.action == Intent.ACTION_SCREEN_OFF) {
-                commit(); h.removeCallbacks(tick); pkg?.let { markExit(it) }
+                val was = startedAt != 0L; commit("screen"); h.removeCallbacks(tick); if (was) pkg?.let { markExit(it) }
             } else if (!(getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked) resume()
         }
     }
@@ -67,18 +70,23 @@ class LimiterService : AccessibilityService() {
         enter(p)
     }
 
-    private fun commit() {
+    private fun commit(reason: String = "left") {
         val p = pkg
-        if (startedAt != 0L && p != null) Prefs.addMs(this, p, SystemClock.elapsedRealtime() - startedAt, sessionDay.ifEmpty { Prefs.today(this) })
+        if (startedAt != 0L && p != null) {
+            val ms = SystemClock.elapsedRealtime() - startedAt
+            Prefs.addMs(this, p, ms, sessionDay.ifEmpty { Prefs.today(this) })
+            Prefs.logSession(this, p, sessionStartWall, ms, reason)
+        }
         startedAt = 0L; Prefs.clearRec(this)
     }
 
     private fun enter(p: String?, continuing: Boolean = false) {
-        commit(); h.removeCallbacks(tick); h.removeCallbacks(recheck)
+        val wasCounting = startedAt != 0L
+        commit(if (continuing) "recheck" else "left"); h.removeCallbacks(tick); h.removeCallbacks(recheck)
         val prev = pkg
-        if (!continuing && prev != null && prev != p) markExit(prev)
+        if (!continuing && wasCounting && prev != null && prev != p) markExit(prev)   // only a really used session earns the re-entry grace
         pkg = p
-        if (!Prefs.consent(this) || p == null || p !in Prefs.apps(this)) { hideOverlay(); return }
+        if (!Prefs.consent(this) || p == null || p !in Prefs.apps(this) || p in Prefs.protectedPkgs(this)) { hideOverlay(); return }
         val until = Prefs.blockedUntilMin(this, p)
         if (until != null || Prefs.usedMs(this, p) >= Prefs.limitMs(this, p)) {
             showBlock(p, until)
@@ -94,7 +102,9 @@ class LimiterService : AccessibilityService() {
     }
 
     private fun startCounting(p: String) {
-        startedAt = SystemClock.elapsedRealtime(); sessionDay = Prefs.today(this); Prefs.setRec(this, p)
+        if (startedAt != 0L) return
+        h.removeCallbacks(tick)
+        startedAt = SystemClock.elapsedRealtime(); sessionStartWall = Prefs.nowMs(this); sessionDay = Prefs.today(this); Prefs.setRec(this, p)
         var d = minOf(Prefs.limitMs(this, p) - Prefs.usedMs(this, p), Prefs.msToMidnight(this))
         Prefs.msToNextStart(this, p)?.let { d = minOf(d, it) }
         h.postDelayed(tick, maxOf(d, 500L)) // one timer, no polling
@@ -132,6 +142,7 @@ class LimiterService : AccessibilityService() {
         r.addView(tv(msg, 24f, C.TEXT, true).apply { gravity = Gravity.CENTER; setPadding(0, dp(24), 0, dp(12)) })
         r.addView(tv(if (until != null) s(R.string.off_until, name, Prefs.fmt(this, until)) else
             s(R.string.used_limit, (Prefs.limitMs(this, p) / 60000).toInt(), name), 15f).apply { gravity = Gravity.CENTER })
+        if (until == null && !Prefs.emgToday(this)) r.addView(tv(s(R.string.block_hint), 13f, C.ACCENT).apply { gravity = Gravity.CENTER; setPadding(0, dp(14), 0, 0) })
         r.addView(Button(this).apply { styled(s(R.string.btn_home)); setOnClickListener { goHome() } })
         addOverlay(r, "block", until)
     }
@@ -196,36 +207,81 @@ class LimiterService : AccessibilityService() {
                 return super.dispatchKeyEvent(ev)
             }
         }.apply { pane(s(R.string.pane_panel)); setBackgroundColor(0xAA000000.toInt()); setOnClickListener { hidePanel(true) } }
-        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(20), dp(20), dp(20)) }
-        col.addView(tv(s(R.string.panel_title), 20f, C.TEXT, true))
-        col.addView(tv(s(R.string.protection_on), 13f, C.GREEN).apply { setPadding(0, dp(2), 0, dp(10)) })
-        Prefs.apps(this).sortedBy { label(it).lowercase() }.forEach { p ->
-            val lim = Prefs.limitMin(this, p); val used = (liveUsed(p) / 60000).toInt()
-            val w = Prefs.win(this, p).takeIf { it.on } ?: Prefs.win(this, "g").takeIf { it.on }
-            val info = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
-                addView(tv(label(p), 16f, C.TEXT, true))
-                addView(tv(s(R.string.panel_used, used, lim, Prefs.opens(this@LimiterService, p)), 13f))
-                if (w != null) addView(tv(s(R.string.moon_line, Prefs.summary(this@LimiterService, w)), 12f, C.ACCENT)) }
-            val minus = Button(this).apply {
-                text = s(R.string.minus5); contentDescription = s(R.string.minus5_desc, label(p)); isAllCaps = false; setTextColor(C.TEXT); background = roundBg(C.FIELD, dp(22).toFloat())
-                setOnClickListener { Prefs.setLimit(this@LimiterService, p, maxOf(1, lim - 5)); panel?.let { hidePanel(); buildPanel() } }
+        val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(18), dp(10), dp(18), dp(18)) }
+        // grab handle + header with a close button
+        col.addView(View(this).apply { background = roundBg(C.FIELD, dp(3).toFloat()); layoutParams = LinearLayout.LayoutParams(dp(40), dp(5)).apply { gravity = Gravity.CENTER_HORIZONTAL; bottomMargin = dp(12) } })
+        col.addView(LinearLayout(this).apply {
+            gravity = Gravity.CENTER_VERTICAL
+            addView(LinearLayout(this@LimiterService).apply { orientation = LinearLayout.VERTICAL; layoutParams = LinearLayout.LayoutParams(0, -2, 1f)
+                addView(tv(s(R.string.panel_title), 20f, C.TEXT, true)); addView(tv(s(R.string.protection_on), 13f, C.GREEN)) })
+            addView(tv("✕", 22f, C.MUTED).apply { contentDescription = s(R.string.close); setPadding(dp(14), dp(8), dp(6), dp(8)); setOnClickListener { hidePanel(true) } })
+        })
+        val protectedSet = Prefs.protectedPkgs(this)
+        Prefs.apps(this).filter { it !in protectedSet }.sortedBy { label(it).lowercase() }.forEach { p ->
+            val limMs = Prefs.limitMs(this, p); val lim = Prefs.limitMin(this, p)
+            val usedMs = liveUsed(p); val over = usedMs >= limMs
+            val f = (usedMs.toFloat() / limMs).coerceIn(0f, 1f)
+            val fill = View(this).apply { background = roundBg(if (over) C.RED else C.ACCENT, dp(4).toFloat()) }
+            val bar = FrameLayout(this).apply {
+                background = roundBg(C.BG, dp(4).toFloat()); layoutParams = LinearLayout.LayoutParams(-1, dp(8)).apply { topMargin = dp(10) }
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                addView(fill, FrameLayout.LayoutParams(0, -1)); post { fill.layoutParams = FrameLayout.LayoutParams((width * f).toInt(), -1) }
             }
-            col.addView(LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(0, dp(6), 0, dp(6)); addView(info); addView(minus, LinearLayout.LayoutParams(-2, dp(44))) })
+            val head = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(tv(label(p), 16f, C.TEXT, true).apply { layoutParams = LinearLayout.LayoutParams(0, -2, 1f) })
+                addView(tv(s(R.string.panel_used, (usedMs / 60000).toInt(), lim, Prefs.opens(this@LimiterService, p)), 13f, if (over) C.RED else C.MUTED))
+            }
+            val w = Prefs.win(this, p).takeIf { it.on } ?: Prefs.win(this, "g").takeIf { it.on }
+            val sched = w?.let { tv(s(R.string.moon_line, Prefs.summary(this@LimiterService, it)), 12f, C.ACCENT).apply { setPadding(0, dp(8), 0, 0) } }
+            val minus = Button(this).apply {
+                text = s(R.string.minus5); contentDescription = s(R.string.minus5_desc, label(p)); isAllCaps = false; setTextColor(C.TEXT)
+                background = roundBg(C.FIELD, dp(22).toFloat())
+                val canLower = lim > 5
+                isEnabled = canLower; alpha = if (canLower) 1f else 0.4f
+                if (!canLower) contentDescription = s(R.string.minus5_min_desc, label(p))
+                setOnClickListener {
+                    val c = this@LimiterService
+                    undo = Undo(p, Prefs.hasCustom(c, p), Prefs.limitBase(c, p), Prefs.rawAnchor(c, p), SystemClock.elapsedRealtime())
+                    val n = maxOf(5, lim - 5); Prefs.setLimit(c, p, n)
+                    Toast.makeText(c, s(R.string.limit_now, label(p), n), Toast.LENGTH_SHORT).show()
+                    panel?.let { hidePanel(); buildPanel() }
+                }
+            }
+            val u = undo
+            val undoBtn = if (u != null && u.p == p && SystemClock.elapsedRealtime() - u.at < 10_000) Button(this).apply {
+                text = s(R.string.undo); isAllCaps = false; setTextColor(C.TEXT); background = roundBg(C.ACCENT, dp(22).toFloat())
+                setOnClickListener {
+                    val c = this@LimiterService
+                    if (SystemClock.elapsedRealtime() - u.at < 10_000) Prefs.restoreLimit(c, p, u.custom, u.base, u.anchor)
+                    undo = null; panel?.let { hidePanel(); buildPanel() }
+                }
+            } else null
+            val btns = LinearLayout(this).apply {
+                layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) }
+                addView(minus, LinearLayout.LayoutParams(0, dp(44), 1f))
+                if (undoBtn != null) addView(undoBtn, LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginStart = dp(8) })
+            }
+            col.addView(card(*listOfNotNull(head, bar, sched, btns).toTypedArray()))
         }
-        fun toggle(name: String, on: Boolean, enable: () -> Unit, disableCls: Class<*>) = Button(this).apply {
+        fun toggle(name: String, on: Boolean, enable: () -> Unit) = Button(this).apply {
             text = s(R.string.toggle_fmt, name, s(if (on) R.string.on else R.string.off)); isAllCaps = false; setTextColor(C.TEXT)
-            background = roundBg(if (on) C.ACCENT else C.FIELD, dp(22).toFloat())
-            setOnClickListener { if (on) { Toast.makeText(this@LimiterService, s(R.string.needs_puzzle), Toast.LENGTH_SHORT).show(); openApp(disableCls) } else { enable(); hidePanel(); buildPanel() } }
+            background = roundBg(if (on) C.ACCENT else C.FIELD, dp(23).toFloat())
+            setOnClickListener {
+                if (on) { Toast.makeText(this@LimiterService, s(R.string.needs_puzzle), Toast.LENGTH_SHORT).show(); openApp(SettingsActivity::class.java) }
+                else { enable(); hidePanel(); buildPanel() }
+            }
         }
-        val t = LinearLayout(this).apply { setPadding(0, dp(12), 0, 0)
-            addView(toggle(s(R.string.toggle_pause), Prefs.pauseOn(this@LimiterService), { Prefs.setPause(this@LimiterService, true) }, SettingsActivity::class.java), LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginEnd = dp(8) })
-            addView(toggle(s(R.string.toggle_red), Prefs.redOn(this@LimiterService), { Prefs.setRed(this@LimiterService, true) }, SettingsActivity::class.java), LinearLayout.LayoutParams(0, dp(44), 1f)) }
-        col.addView(t)
-        col.addView(LinearLayout(this).apply { setPadding(0, dp(8), 0, 0)
-            addView(Button(this@LimiterService).apply { text = s(R.string.open_pausely); isAllCaps = false; setTextColor(C.TEXT); background = roundBg(C.ACCENT, dp(22).toFloat()); setOnClickListener { openApp(MainActivity::class.java) } }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginEnd = dp(8) })
-            addView(Button(this@LimiterService).apply { text = s(R.string.close); isAllCaps = false; setTextColor(C.TEXT); background = roundBg(C.FIELD, dp(22).toFloat()); setOnClickListener { hidePanel(true) } }, LinearLayout.LayoutParams(0, dp(44), 1f)) })
-        val sheet = ScrollView(this).apply { background = roundBg(C.BG, dp(24).toFloat()); isClickable = true; addView(col) }
-        scrim.addView(sheet, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { setMargins(dp(10), dp(10), dp(10), dp(10)) })
+        col.addView(LinearLayout(this).apply {
+            addView(toggle(s(R.string.toggle_pause), Prefs.pauseOn(this@LimiterService)) { Prefs.setPause(this@LimiterService, true) }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginEnd = dp(8) })
+            addView(toggle(s(R.string.toggle_red), Prefs.redOn(this@LimiterService)) { Prefs.setRed(this@LimiterService, true) }, LinearLayout.LayoutParams(0, dp(46), 1f))
+        })
+        col.addView(Button(this).apply {
+            text = s(R.string.open_pausely); isAllCaps = false; setTextColor(C.TEXT); background = roundBg(C.ACCENT, dp(25).toFloat())
+            layoutParams = LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(12) }; setOnClickListener { openApp(MainActivity::class.java) }
+        })
+        val sheet = ScrollView(this).apply { background = roundBg(C.BG, dp(28).toFloat()); isClickable = true; addView(col) }
+        scrim.addView(sheet, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { setMargins(dp(8), dp(8), dp(8), dp(8)) })
         val lp = WindowManager.LayoutParams(-1, -1, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, PixelFormat.TRANSLUCENT)
         (getSystemService(WINDOW_SERVICE) as WindowManager).addView(scrim, lp); panel = scrim
@@ -234,9 +290,9 @@ class LimiterService : AccessibilityService() {
     // only ever triggered by the user tapping a button / pressing Back
     private fun goHome() { performGlobalAction(GLOBAL_ACTION_HOME); hideOverlay() }
 
-    override fun onInterrupt() { commit(); h.removeCallbacks(tick) }
+    override fun onInterrupt() { commit("stopped"); h.removeCallbacks(tick) }
     override fun onDestroy() {
-        commit(); h.removeCallbacks(tick); h.removeCallbacks(recheck); hideOverlay(); hidePanel(); registered = false
+        commit("stopped"); h.removeCallbacks(tick); h.removeCallbacks(recheck); hideOverlay(); hidePanel(); registered = false
         try { unregisterReceiver(receiver) } catch (_: Exception) {}
         super.onDestroy()
     }

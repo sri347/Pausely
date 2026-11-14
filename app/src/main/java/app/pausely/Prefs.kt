@@ -1,6 +1,7 @@
 package app.pausely
 
 import android.content.Context
+import android.content.Intent
 import android.os.SystemClock
 import android.provider.Settings
 import org.json.JSONArray
@@ -78,13 +79,32 @@ object Prefs {
     fun clearLimit(c: Context, p: String) = sp(c).edit().remove("limit_$p").remove("anchor_$p").apply()
     fun limitBase(c: Context, p: String) = sp(c).getInt("limit_$p", defaultLimit(c))
     fun setLimit(c: Context, p: String, m: Int) = sp(c).edit().putInt("limit_$p", m).putString("anchor_$p", today(c)).apply()
-    fun limitMin(c: Context, p: String): Int {
-        val base = limitBase(c, p)
+    private fun reduced(c: Context, base: Int, anchor: String): Int {
         if (!redOn(c) || base <= 5) return base
-        val t = today(c)
-        val a = sp(c).getString("anchor_$p", sp(c).getString("red_start", t))!!
-        val weeks = ChronoUnit.DAYS.between(LocalDate.parse(a), LocalDate.parse(t)) / 7
+        val weeks = ChronoUnit.DAYS.between(LocalDate.parse(anchor), LocalDate.parse(today(c))) / 7
         return maxOf(5, base - weeks.toInt())
+    }
+    fun limitMin(c: Context, p: String): Int = reduced(c, limitBase(c, p), sp(c).getString("anchor_$p", sp(c).getString("red_start", today(c)))!!)
+    /** what an app following the default really gets right now (after gradual reduction) */
+    fun defaultEffective(c: Context): Int = reduced(c, defaultLimit(c), sp(c).getString("red_start", today(c))!!)
+    // exact snapshot/restore so Undo can never loosen a limit
+    fun rawAnchor(c: Context, p: String): String? = sp(c).getString("anchor_$p", null)
+    fun restoreLimit(c: Context, p: String, custom: Boolean, base: Int, anchor: String?) {
+        val e = sp(c).edit()
+        if (custom) e.putInt("limit_$p", base) else e.remove("limit_$p")
+        if (anchor != null) e.putString("anchor_$p", anchor) else e.remove("anchor_$p")
+        e.apply()
+    }
+    /** apps that must never be blocked: home screen, dialer/emergency, system settings and Pausely itself */
+    fun protectedPkgs(c: Context): Set<String> {
+        val pm = c.packageManager; val set = HashSet<String>()
+        try {
+            pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0).forEach { set.add(it.activityInfo.packageName) }
+            pm.queryIntentActivities(Intent(Intent.ACTION_DIAL), 0).forEach { set.add(it.activityInfo.packageName) }
+        } catch (e: Exception) { }
+        set.addAll(listOf("com.android.settings", "com.android.emergency", "com.android.phone", "com.android.dialer", "com.google.android.dialer",
+            "com.samsung.android.dialer", "com.android.server.telecom", "com.android.systemui", c.packageName))
+        return set
     }
     fun limitMs(c: Context, p: String) = limitMin(c, p) * 60_000L + (if (emgToday(c) && sp(c).getString("emg_pkg", "") == p) EMERGENCY_MS else 0L)
 
@@ -99,12 +119,14 @@ object Prefs {
     fun addOpen(c: Context, p: String) { val d = today(c); sp(c).edit().putInt("o_${d}_$p", opens(c, p, d) + 1).apply() }
     fun days(c: Context, n: Int): List<String> { val t = LocalDate.parse(today(c)); return (n - 1 downTo 0).map { t.minusDays(it.toLong()).toString() } }
     fun dayTotalMs(c: Context, day: String) = sp(c).all.entries.filter { it.key.startsWith("u_${day}_") }.sumOf { (it.value as Long) }
-    fun pkgTotals(c: Context, n: Int): Map<String, Pair<Long, Int>> {
-        val ds = days(c, n).toSet(); val m = HashMap<String, Pair<Long, Int>>()
+    /** per app: total ms, opens, number of days with at least 1 minute of use */
+    fun pkgTotals(c: Context, n: Int): Map<String, Triple<Long, Int, Int>> {
+        val ds = days(c, n).toSet(); val m = HashMap<String, Triple<Long, Int, Int>>()
         sp(c).all.forEach { (k, v) ->
             if (k.length > 13 && (k.startsWith("u_") || k.startsWith("o_")) && k.substring(2, 12) in ds) {
-                val p = k.substring(13); val cur = m[p] ?: (0L to 0)
-                m[p] = if (k[0] == 'u') (cur.first + (v as Long)) to cur.second else cur.first to (cur.second + (v as Int))
+                val p = k.substring(13); val cur = m[p] ?: Triple(0L, 0, 0)
+                m[p] = if (k[0] == 'u') { val ms = v as Long; Triple(cur.first + ms, cur.second, cur.third + (if (ms >= 60_000L) 1 else 0)) }
+                       else Triple(cur.first, cur.second + (v as Int), cur.third)
             }
         }
         return m
@@ -151,12 +173,27 @@ object Prefs {
     }
     fun summary(c: Context, w: Win) = "${fmt(c, w.s)} – ${fmt(c, w.e)} · ${daysLabel(c, w.days)}"
 
+    // ---- session log (last 20 counted sessions, for checking accuracy) ----
+    class Sess(val p: String, val t: Long, val ms: Long, val r: String)
+    fun logSession(c: Context, p: String, startMs: Long, ms: Long, reason: String) {
+        if (ms < 1000) return
+        val arr = try { JSONArray(sp(c).getString("slog", "[]")) } catch (e: Exception) { JSONArray() }
+        arr.put(JSONObject().put("p", p).put("t", startMs).put("ms", ms).put("r", reason))
+        val keep = JSONArray(); for (i in maxOf(0, arr.length() - 20) until arr.length()) keep.put(arr.get(i))
+        sp(c).edit().putString("slog", keep.toString()).apply()
+    }
+    fun sessions(c: Context): List<Sess> = try {
+        val a = JSONArray(sp(c).getString("slog", "[]"))
+        (a.length() - 1 downTo 0).map { val o = a.getJSONObject(it); Sess(o.getString("p"), o.getLong("t"), o.getLong("ms"), o.getString("r")) }
+    } catch (e: Exception) { emptyList() }
+
     // ---- crash recovery for a running session ----
     fun setRec(c: Context, p: String) = sp(c).edit().putString("rec_pkg", p).putLong("rec_at", System.currentTimeMillis()).apply()
     fun clearRec(c: Context) = sp(c).edit().remove("rec_pkg").apply()
     fun recoverRec(c: Context) {
         val p = sp(c).getString("rec_pkg", null) ?: return
-        addMs(c, p, (System.currentTimeMillis() - sp(c).getLong("rec_at", 0)).coerceIn(0, 15 * 60_000L)); clearRec(c)
+        val at = sp(c).getLong("rec_at", 0); val ms = (System.currentTimeMillis() - at).coerceIn(0, 15 * 60_000L)
+        addMs(c, p, ms); logSession(c, p, at, ms, "recovered"); clearRec(c)
     }
 
     // ---- puzzle lockout ----

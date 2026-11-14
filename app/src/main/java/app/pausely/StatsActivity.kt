@@ -27,7 +27,18 @@ class StatsActivity : Activity() {
         if (t.isEmpty()) c.addView(tv(s(R.string.no_usage)))
         t.entries.sortedByDescending { it.value.first }.forEach { (p, v) ->
             c.addView(card(tv(label(p), 16f, C.TEXT, true),
-                tv(s(R.string.stats_line, (v.first / 60000).toInt(), (v.first / 60000 / n).toInt(), v.second), 13f)))
+                tv(s(R.string.stats_line, (v.first / 60000).toInt(), (v.first / 60000 / maxOf(1, v.third)).toInt(), v.second), 13f)))
+        }
+        c.addView(tv(s(R.string.log_title), 18f, C.TEXT, true).apply { setPadding(0, dp(16), 0, 0) })
+        c.addView(tv(s(R.string.log_sub), 12f).apply { setPadding(0, dp(2), 0, dp(8)) })
+        val sessions = Prefs.sessions(this)
+        if (sessions.isEmpty()) c.addView(tv(s(R.string.log_none)))
+        val df = java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
+        sessions.forEach { e ->
+            val why = s(when (e.r) { "limit" -> R.string.reason_limit; "screen" -> R.string.reason_screen; "stopped" -> R.string.reason_stopped
+                "recovered" -> R.string.reason_recovered; "recheck" -> R.string.reason_recheck; else -> R.string.reason_left })
+            c.addView(card(tv(s(R.string.log_head, label(e.p), s(R.string.dur_fmt, (e.ms / 60000).toInt(), ((e.ms / 1000) % 60).toInt())), 15f, C.TEXT, true),
+                tv(s(R.string.log_line, df.format(java.util.Date(e.t)), why), 12f)))
         }
     }
 }

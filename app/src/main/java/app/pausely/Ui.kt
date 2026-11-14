@@ -46,7 +46,7 @@ fun Context.sw(s: String, on: Boolean, f: (Boolean) -> Unit) = Switch(this).appl
 fun View.fitSystem(h: Int, v: Int) {
     setOnApplyWindowInsetsListener { x, i ->
         val t: Int; val b: Int
-        if (Build.VERSION.SDK_INT >= 30) { val s = i.getInsets(WindowInsets.Type.systemBars()); t = s.top; b = s.bottom }
+        if (Build.VERSION.SDK_INT >= 30) { val s = i.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime()); t = s.top; b = s.bottom }
         else { @Suppress("DEPRECATION") t = i.systemWindowInsetTop; @Suppress("DEPRECATION") b = i.systemWindowInsetBottom }
         x.setPadding(h, v + t, h, v + b); i
     }

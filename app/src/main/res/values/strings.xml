@@ -40,8 +40,8 @@
     <string name="limited_apps">Limited apps</string>
     <string name="add_app">+ Add app</string>
     <string name="card_line">%1$dm %2$ds of %3$dm%4$s · %5$d opens</string>
-    <string name="tag_default"> (default)</string>
-    <string name="tag_shrinking"> ↓ shrinking</string>
+    <string name="tag_default">(default)</string>
+    <string name="tag_shrinking">↓ shrinking</string>
     <string name="bedtime_line">🌙 Bedtime %1$s</string>
     <string name="moon_line">🌙 %1$s</string>
     <string name="no_apps">No apps yet. Tap + Add app.</string>
@@ -87,7 +87,7 @@
     <string name="import_">Import settings</string>
     <string name="guide">Setup guide</string>
     <string name="privacy">Privacy</string>
-    <string name="privacy_body">Pausely runs entirely on your phone. It has no internet permission and sends nothing anywhere.\n\nIt uses the Accessibility service only to learn which app is in the foreground, so it can time your use and show pause/block screens. It does not read screen content, messages or passwords.\n\nIt requests no permissions at all.\n\nStored locally: your app list, limits, schedules and 30 days of per-app usage minutes and open counts. Uninstalling removes it.\n\nQuestions: srikrishna.ayyanki@gmail.com</string>
+    <string name="privacy_body">Pausely runs entirely on your phone. It has no internet permission and sends nothing anywhere.\n\nIt uses the Accessibility service only to learn which app is in the foreground, so it can time your use and show pause/block screens. It does not read screen content, messages or passwords.\n\nIt requests no permissions at all.\n\nStored locally: your app list, limits, schedules, 30 days of per-app usage minutes and open counts, and a log of your last 20 counted sessions. Uninstalling removes it.\n\nQuestions: srikrishna.ayyanki@gmail.com</string>
     <string name="about_title">About the developer</string>
     <string name="about_body">Built by Sri Krishna Ayyanki\nsrikrishna.ayyanki@gmail.com</string>
     <string name="linkedin">LinkedIn</string>
@@ -104,7 +104,7 @@
     <string name="schedules_sub">Block apps completely during these hours. Changing a schedule needs a puzzle.</string>
     <string name="bedtime_all">Bedtime (all limited apps)</string>
     <string name="bedtime_this">Bedtime (applies to all apps)</string>
-    <string name="blocked_fmt">Blocked %1$s</string>
+    <string name="blocked_fmt">Blocks %1$s</string>
     <string name="off_fmt">Off · %1$s</string>
     <string name="from_fmt">From %1$s</string>
     <string name="to_fmt">To %1$s</string>
@@ -122,7 +122,7 @@
     <string name="show7">Show 7 days</string>
     <string name="by_app">By app</string>
     <string name="no_usage">No usage recorded yet.</string>
-    <string name="stats_line">%1$d min total · %2$d min/day avg · %3$d opens</string>
+    <string name="stats_line">%1$d min total · %2$d min per active day · %3$d opens</string>
     <string name="chart_desc">Daily usage chart: %1$s</string>
     <string name="minutes_short">%1$dm</string>
     <string name="guide_title">How to set up</string>
@@ -185,4 +185,33 @@
     </string-array>
     <string name="banner_off_title">Protection is OFF</string>
     <string name="banner_off_text">Pausely can\'t limit anything until you turn it on. Tap here to fix it.</string>
+    <string name="card_over">Limit reached · %1$dm %2$ds used today (limit %3$dm) · %4$d opens</string>
+    <string name="log_title">Recent sessions</string>
+    <string name="log_sub">The last 20 times Pausely counted time, so you can check its accuracy. Stored only on this phone.</string>
+    <string name="log_none">No sessions recorded yet.</string>
+    <string name="log_head">%1$s · %2$s</string>
+    <string name="log_line">%1$s · %2$s</string>
+    <string name="dur_fmt">%1$dm %2$ds</string>
+    <string name="reason_left">left the app</string>
+    <string name="reason_limit">limit or schedule reached</string>
+    <string name="reason_screen">screen turned off</string>
+    <string name="reason_stopped">service stopped</string>
+    <string name="reason_recovered">recovered after a restart</string>
+    <string name="reason_recheck">limits re-checked</string>
+    <string name="undo">Undo</string>
+    <string name="minus5_min_desc">%1$s is already at the 5 minute minimum for quick changes</string>
+    <string name="limit_now">%1$s limit is now %2$d min</string>
+    <string name="same_time">Start and end can\'t be the same time</string>
+    <string name="pick_title">Add apps</string>
+    <string name="search_hint">Search apps</string>
+    <string name="suggested">Suggested</string>
+    <string name="all_apps">All apps</string>
+    <string name="add_n">Add %1$d apps</string>
+    <string name="no_match">No apps match \"%1$s\"</string>
+    <string name="key_back">Delete</string>
+    <string name="key_sign">Plus or minus</string>
+    <string name="block_hint">Need a little more time? Open Pausely, tap the app and choose Emergency (once a day).</string>
+    <string name="puzzle_why">A quick puzzle before you loosen a limit, so a weak moment can\'t undo it.</string>
+    <string name="added_n">Added %1$d apps with the default limit of %2$d min. Tap a card to customise.</string>
+    <string name="used_of">of %1$dm today</string>
 </resources>

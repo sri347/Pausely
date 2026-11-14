@@ -11,7 +11,9 @@ Android app that limits time in apps like Instagram and X. Native Kotlin, no dep
 - Gradual reduction (optional): limits shrink 1 min per week down to 5 min
 - Emergency unlock: once a day, +5 min, puzzle plus 30 s wait
 - Quick panel from Android's floating accessibility button: usage, -5 min, toggles
-- 30-day stats, settings export/import, in-app setup guide
+- 30-day stats plus a log of the last 20 counted sessions (why each ended), settings export/import, in-app setup guide
+- Searchable app picker with icons and a Suggested group
+- Redesigned quick panel (progress per app, -5 min with undo, toggles)
 - Loud in-app banner when protection (the accessibility service) is switched off
 - Screen-reader labels, all text in string resources, 12/24-hour aware times
 

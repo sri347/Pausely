@@ -28,11 +28,11 @@ class MainActivity : Activity() {
         val apps = Prefs.apps(this).toList()
         val used = apps.sumOf { Prefs.usedMs(this, it) }; val lim = apps.sumOf { Prefs.limitMs(this, it) }
         c.addView(Ring(this).apply {
-            frac = if (lim > 0) used.toFloat() / lim else 0f; center = s(R.string.minutes_short, (used / 60000).toInt()); sub = s(R.string.used_today)
+            frac = if (lim > 0) used.toFloat() / lim else 0f; center = s(R.string.minutes_short, (used / 60000).toInt()); sub = s(R.string.used_of, (lim / 60000).toInt())
             contentDescription = s(R.string.ring_desc, (used / 60000).toInt(), (lim / 60000).toInt())
             layoutParams = LinearLayout.LayoutParams(dp(220), dp(220)).apply { gravity = Gravity.CENTER_HORIZONTAL; topMargin = dp(20); bottomMargin = dp(20) }
         })
-        c.addView(chip(s(R.string.default_chip, Prefs.defaultLimit(this)), C.TEXT) { changeDefaultLimit { render() } })
+        c.addView(chip(s(R.string.default_chip, Prefs.defaultEffective(this)), C.TEXT) { changeDefaultLimit { render() } })
         c.addView(chip(s(if (on) R.string.prot_on else R.string.prot_off), if (on) C.GREEN else C.RED) {
             startActivity(if (on) Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS) else Intent(this, GuideActivity::class.java))
         })
@@ -42,7 +42,7 @@ class MainActivity : Activity() {
         c.addView(LinearLayout(this).apply {
             gravity = Gravity.CENTER_VERTICAL; layoutParams = LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(24); bottomMargin = dp(8) }
             addView(tv(s(R.string.limited_apps), 18f, C.TEXT, true).apply { layoutParams = LinearLayout.LayoutParams(0, -2, 1f) })
-            addView(tv(s(R.string.add_app), 15f, C.ACCENT, true).apply { setPadding(dp(12), dp(12), 0, dp(12)); setOnClickListener { pickApps() } })
+            addView(tv(s(R.string.add_app), 15f, C.ACCENT, true).apply { setPadding(dp(12), dp(12), 0, dp(12)); setOnClickListener { startActivity(Intent(this@MainActivity, PickAppsActivity::class.java)) } })
         })
         apps.sortedBy { label(it).lowercase() }.forEach { p ->
             val u = Prefs.usedMs(this, p); val l = Prefs.limitMs(this, p); val f = (u.toFloat() / l).coerceIn(0f, 1f)
@@ -52,11 +52,17 @@ class MainActivity : Activity() {
                 importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
                 addView(fill, FrameLayout.LayoutParams(0, -1)); post { fill.layoutParams = FrameLayout.LayoutParams((width * f).toInt(), -1) }
             }
-            val note = (if (Prefs.hasCustom(this, p)) "" else s(R.string.tag_default)) + (if (Prefs.redOn(this) && Prefs.limitMin(this, p) < Prefs.limitBase(this, p)) s(R.string.tag_shrinking) else "")
+            val note = (if (Prefs.hasCustom(this, p)) "" else " " + s(R.string.tag_default)) + (if (Prefs.redOn(this) && Prefs.limitMin(this, p) < Prefs.limitBase(this, p)) " " + s(R.string.tag_shrinking) else "")
             val sw = Prefs.win(this, p).let { if (it.on) s(R.string.moon_line, Prefs.summary(this, it)) else null }
                 ?: Prefs.win(this, "g").let { if (it.on) s(R.string.bedtime_line, Prefs.summary(this, it)) else null }
-            val cd = card(tv(label(p), 16f, C.TEXT, true),
-                tv(s(R.string.card_line, (u / 60000).toInt(), ((u / 1000) % 60).toInt(), (l / 60000).toInt(), note, Prefs.opens(this, p)), 13f), bar)
+            val title = LinearLayout(this).apply {
+                gravity = Gravity.CENTER_VERTICAL
+                addView(tv(label(p), 16f, C.TEXT, true).apply { layoutParams = LinearLayout.LayoutParams(0, -2, 1f) })
+                addView(tv("›", 22f, C.MUTED).apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO })
+            }
+            val cd = card(title,
+                if (u >= l) tv(s(R.string.card_over, (u / 60000).toInt(), ((u / 1000) % 60).toInt(), (l / 60000).toInt(), Prefs.opens(this, p)), 13f, C.RED)
+                else tv(s(R.string.card_line, (u / 60000).toInt(), ((u / 1000) % 60).toInt(), (l / 60000).toInt(), note, Prefs.opens(this, p)), 13f), bar)
             if (sw != null) cd.addView(tv(sw, 12f, C.ACCENT).apply { setPadding(0, dp(8), 0, 0) })
             cd.setOnClickListener { options(p) }; c.addView(cd)
         }
@@ -66,7 +72,7 @@ class MainActivity : Activity() {
     private fun consent() {
         val c = screen(s(R.string.consent_title))
         c.addView(card(tv(s(R.string.consent_head), 16f, C.TEXT, true), tv(s(R.string.consent_body)).apply { setPadding(0, dp(8), 0, 0) }))
-        c.addView(btn(s(R.string.consent_yes)) { Prefs.setConsent(this); render() })
+        c.addView(btn(s(R.string.consent_yes)) { Prefs.setConsent(this); if (!serviceOn()) startActivity(Intent(this, GuideActivity::class.java)); render() })
         c.addView(btn(s(R.string.consent_no), false) { finish() })
     }
 
@@ -74,7 +80,7 @@ class MainActivity : Activity() {
 
     private fun options(p: String) {
         val items = mutableListOf(R.string.opt_change to s(R.string.opt_change))
-        if (Prefs.hasCustom(this, p)) items.add(R.string.opt_default to s(R.string.opt_default, Prefs.defaultLimit(this)))
+        if (Prefs.hasCustom(this, p)) items.add(R.string.opt_default to s(R.string.opt_default, Prefs.defaultEffective(this)))
         items.add(R.string.opt_schedule to s(R.string.opt_schedule))
         if (!Prefs.emgToday(this)) items.add(R.string.opt_emergency to s(R.string.opt_emergency))
         items.add(R.string.opt_remove to s(R.string.opt_remove))
@@ -83,7 +89,7 @@ class MainActivity : Activity() {
                 R.string.opt_change -> changeAppLimit(p) { render() }
                 R.string.opt_schedule -> startActivity(Intent(this, SchedulesActivity::class.java).putExtra("pkg", p))
                 R.string.opt_default -> {
-                    if (Prefs.defaultLimit(this) <= Prefs.limitMin(this, p)) { Prefs.clearLimit(this, p); render() } else puzzle { Prefs.clearLimit(this, p); render() }
+                    if (Prefs.defaultEffective(this) <= Prefs.limitMin(this, p)) { Prefs.clearLimit(this, p); render() } else puzzle { Prefs.clearLimit(this, p); render() }
                 }
                 R.string.opt_remove -> puzzle { Prefs.setApps(this, Prefs.apps(this) - p); render() }
                 else -> puzzle { waitThen(30) { Prefs.useEmergency(this, p); render() } }
@@ -100,15 +106,5 @@ class MainActivity : Activity() {
             if (!d.isShowing) return
             left--; if (left > 0) { d.setMessage(s(R.string.unlocking_in, left)); h.postDelayed(this, 1000) } else { d.setMessage(s(R.string.ready)); b.isEnabled = true }
         } }, 1000)
-    }
-
-    private fun pickApps() {
-        val have = Prefs.apps(this)
-        val list = packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
-            .map { it.activityInfo.packageName to it.loadLabel(packageManager).toString() }
-            .filter { it.first != packageName && it.first !in have }.distinctBy { it.first }.sortedBy { it.second.lowercase() }
-        val sel = BooleanArray(list.size)
-        dlg().setTitle(s(R.string.add_apps_title)).setMultiChoiceItems(list.map { it.second }.toTypedArray(), sel) { _, i, c -> sel[i] = c }
-            .setPositiveButton(s(R.string.add)) { _, _ -> Prefs.setApps(this, have + list.filterIndexed { i, _ -> sel[i] }.map { it.first }); render() }.show()
     }
 }
