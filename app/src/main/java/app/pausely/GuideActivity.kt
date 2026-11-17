@@ -6,7 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 
-class GuideActivity : Activity() {
+class GuideActivity : SecureActivity() {
     override fun onCreate(b: Bundle?) {
         super.onCreate(b)
         val c = screen(s(R.string.guide_title), s(R.string.guide_sub))

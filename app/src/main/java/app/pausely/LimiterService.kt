@@ -22,7 +22,7 @@ class LimiterService : AccessibilityService() {
     private var overlay: View? = null
     private var panel: View? = null
     private var focusReq: AudioFocusRequest? = null
-    private class Undo(val p: String, val custom: Boolean, val base: Int, val anchor: String?, val at: Long)
+    private class Undo(val p: String, val custom: Boolean, val base: Int, val anchor: String?, val applied: Int, val at: Long)
     private var undo: Undo? = null          // last quick-panel -5, undoable for 10 s
     private var sessionStartWall = 0L
     private var sessionDay = ""             // day a running session started on (midnight-safe accounting)
@@ -50,7 +50,7 @@ class LimiterService : AccessibilityService() {
     override fun onServiceConnected() {
         if (registered) return
         registered = true
-        Prefs.recoverRec(this)
+        Prefs.recoverRec(this); unmuteMedia()
         accessibilityButtonController.registerAccessibilityButtonCallback(object : AccessibilityButtonController.AccessibilityButtonCallback() {
             override fun onClicked(controller: AccessibilityButtonController) { showPanel() }
         })
@@ -60,8 +60,16 @@ class LimiterService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
-        if (e.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        val type = e.eventType
+        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && type != AccessibilityEvent.TYPE_VIEW_SCROLLED && type != AccessibilityEvent.TYPE_VIEW_CLICKED) return
         val p = e.packageName?.toString() ?: return
+        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            // someone is scrolling/tapping inside a limited app. If we think it is not on screen (you peeked at recents and came back),
+            // or it is on screen but neither counting nor blocked, re-evaluate right now.
+            if (p == packageName || p !in Prefs.apps(this)) return
+            if (p == pkg && (startedAt != 0L || overlay != null || panel != null)) return
+            enter(p); return
+        }
         // transient system windows (dialogs, share sheet, keyboard) must not look like "left the app"
         val ime = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)?.substringBefore('/')
         if (p in IGNORED || p == ime) return
@@ -129,13 +137,20 @@ class LimiterService : AccessibilityService() {
         am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_MEDIA_PAUSE))
         am.dispatchMediaKeyEvent(KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_MEDIA_PAUSE))
     }
+    private fun muteMedia() {
+        try {
+            val am = getSystemService(AUDIO_SERVICE) as AudioManager
+            if (!am.isStreamMute(AudioManager.STREAM_MUSIC)) { am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_MUTE, 0); Prefs.setMuted(this, true) }
+        } catch (_: Exception) { }
+    }
+    private fun unmuteMedia() = Prefs.restoreVolume(this)
     private fun releaseAudio() {
         focusReq?.let { (getSystemService(AUDIO_SERVICE) as AudioManager).abandonAudioFocusRequest(it) }; focusReq = null
     }
 
     private fun showBlock(p: String, until: Int?) {
         if (overlay != null) { if (ovKind == "block" && ovUntil == until) return; hideOverlay() }
-        stopAudio()
+        stopAudio(); muteMedia()
         val name = label(p); val (emoji, msg) = Messages.block(this, name)
         val r = root()
         r.addView(tv(emoji, 72f).apply { gravity = Gravity.CENTER; importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO })
@@ -148,6 +163,7 @@ class LimiterService : AccessibilityService() {
     }
 
     private fun showNudge(p: String) {
+        muteMedia()
         val name = label(p); val (emoji, msg) = Messages.nudge(this, name)
         val r = root()
         r.addView(tv(emoji, 72f).apply { gravity = Gravity.CENTER; importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO })
@@ -184,7 +200,7 @@ class LimiterService : AccessibilityService() {
 
     private fun hideOverlay() {
         overlay?.let { try { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } catch (_: Exception) {} }
-        overlay = null; ovKind = null; ovUntil = null; releaseAudio()
+        overlay = null; ovKind = null; ovUntil = null; releaseAudio(); unmuteMedia()
     }
 
     // ---------- quick panel (tap the floating accessibility button) ----------
@@ -217,7 +233,7 @@ class LimiterService : AccessibilityService() {
             addView(tv("✕", 22f, C.MUTED).apply { contentDescription = s(R.string.close); setPadding(dp(14), dp(8), dp(6), dp(8)); setOnClickListener { hidePanel(true) } })
         })
         val protectedSet = Prefs.protectedPkgs(this)
-        Prefs.apps(this).filter { it !in protectedSet }.sortedBy { label(it).lowercase() }.forEach { p ->
+        Prefs.installedApps(this).filter { it !in protectedSet }.sortedBy { label(it).lowercase() }.forEach { p ->
             val limMs = Prefs.limitMs(this, p); val lim = Prefs.limitMin(this, p)
             val usedMs = liveUsed(p); val over = usedMs >= limMs
             val f = (usedMs.toFloat() / limMs).coerceIn(0f, 1f)
@@ -242,8 +258,9 @@ class LimiterService : AccessibilityService() {
                 if (!canLower) contentDescription = s(R.string.minus5_min_desc, label(p))
                 setOnClickListener {
                     val c = this@LimiterService
-                    undo = Undo(p, Prefs.hasCustom(c, p), Prefs.limitBase(c, p), Prefs.rawAnchor(c, p), SystemClock.elapsedRealtime())
-                    val n = maxOf(5, lim - 5); Prefs.setLimit(c, p, n)
+                    val n = maxOf(5, lim - 5)
+                    undo = Undo(p, Prefs.hasCustom(c, p), Prefs.limitBase(c, p), Prefs.rawAnchor(c, p), n, SystemClock.elapsedRealtime())
+                    Prefs.setLimit(c, p, n)
                     Toast.makeText(c, s(R.string.limit_now, label(p), n), Toast.LENGTH_SHORT).show()
                     panel?.let { hidePanel(); buildPanel() }
                 }
@@ -253,7 +270,7 @@ class LimiterService : AccessibilityService() {
                 text = s(R.string.undo); isAllCaps = false; setTextColor(C.TEXT); background = roundBg(C.ACCENT, dp(22).toFloat())
                 setOnClickListener {
                     val c = this@LimiterService
-                    if (SystemClock.elapsedRealtime() - u.at < 10_000) Prefs.restoreLimit(c, p, u.custom, u.base, u.anchor)
+                    if (SystemClock.elapsedRealtime() - u.at < 10_000 && Prefs.hasCustom(c, p) && Prefs.limitBase(c, p) == u.applied) Prefs.restoreLimit(c, p, u.custom, u.base, u.anchor)
                     undo = null; panel?.let { hidePanel(); buildPanel() }
                 }
             } else null

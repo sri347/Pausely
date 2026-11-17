@@ -7,12 +7,12 @@ import java.time.DayOfWeek
 import java.time.format.TextStyle
 import java.util.Locale
 
-class SchedulesActivity : Activity() {
+class SchedulesActivity : SecureActivity() {
     override fun onResume() { super.onResume(); render() }
     private fun render() {
         val only = intent.getStringExtra("pkg")
         val c = screen(if (only != null) s(R.string.schedule_one, label(only)) else s(R.string.schedules), s(R.string.schedules_sub))
-        if (only == null) { c.addView(winCard("g", s(R.string.bedtime_all))); Prefs.apps(this).sortedBy { label(it).lowercase() }.forEach { c.addView(winCard(it, label(it))) } }
+        if (only == null) { c.addView(winCard("g", s(R.string.bedtime_all))); Prefs.installedApps(this).sortedBy { label(it).lowercase() }.forEach { c.addView(winCard(it, label(it))) } }
         else { c.addView(winCard(only, label(only))); c.addView(winCard("g", s(R.string.bedtime_this))) }
     }
     private fun winCard(k: String, title: String): LinearLayout {

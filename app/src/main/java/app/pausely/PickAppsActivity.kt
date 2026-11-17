@@ -14,7 +14,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.*
 
 /** Full-screen, searchable app picker with icons, a Suggested group and a live "Add (n)" button. */
-class PickAppsActivity : Activity() {
+class PickAppsActivity : SecureActivity() {
     private class Row(val pkg: String?, val text: String)          // pkg == null -> section header / message
     private class Holder(val icon: ImageView, val label: TextView, val check: TextView)
 

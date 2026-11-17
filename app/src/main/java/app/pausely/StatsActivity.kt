@@ -7,7 +7,7 @@ import java.time.LocalDate
 import java.time.format.TextStyle
 import java.util.Locale
 
-class StatsActivity : Activity() {
+class StatsActivity : SecureActivity() {
     private var n = 7
     override fun onResume() { super.onResume(); render() }
     private fun render() {
@@ -22,7 +22,7 @@ class StatsActivity : Activity() {
         }
         c.addView(card(tv(s(R.string.total_chart), 14f, C.MUTED), bars))
         c.addView(btn(s(if (n == 7) R.string.show30 else R.string.show7), false) { n = if (n == 7) 30 else 7; render() })
-        val t = Prefs.pkgTotals(this, n)
+        val t = Prefs.pkgTotals(this, n).filterKeys { Prefs.isInstalled(this, it) }
         c.addView(tv(s(R.string.by_app), 18f, C.TEXT, true).apply { setPadding(0, dp(16), 0, dp(8)) })
         if (t.isEmpty()) c.addView(tv(s(R.string.no_usage)))
         t.entries.sortedByDescending { it.value.first }.forEach { (p, v) ->

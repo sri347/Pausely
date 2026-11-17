@@ -43,11 +43,22 @@ object Prefs {
     // when we last saw a limited app leave the foreground (survives service restarts)
     fun markExit(c: Context, p: String) = sp(c).edit().putLong("exit_$p", nowMs(c)).apply()
     fun exitAt(c: Context, p: String) = sp(c).getLong("exit_$p", 0)
-    private fun cal(c: Context): Calendar = Calendar.getInstance().apply { timeInMillis = nowMs(c) }
+    private fun cal(c: Context): Calendar = Calendar.getInstance(zone(c)).apply { timeInMillis = nowMs(c) }
+    /** The zone used for "today" and schedules. A new system zone is only trusted after 24 h, so switching zones can't reset the day or dodge a schedule. */
+    private fun zone(c: Context): TimeZone {
+        val sys = TimeZone.getDefault().id; val s = sp(c)
+        val cur = s.getString("tz_cur", null)
+        if (cur == null) { s.edit().putString("tz_cur", sys).apply(); return TimeZone.getDefault() }
+        if (sys == cur) { if (s.contains("tz_cand")) s.edit().remove("tz_cand").apply(); return TimeZone.getTimeZone(cur) }
+        val el = SystemClock.elapsedRealtime(); val since = s.getLong("tz_since", 0)
+        if (s.getString("tz_cand", "") != sys || el < since) { s.edit().putString("tz_cand", sys).putLong("tz_since", el).apply(); return TimeZone.getTimeZone(cur) }
+        if (el - since >= 24 * 3_600_000L) { s.edit().putString("tz_cur", sys).remove("tz_cand").apply(); return TimeZone.getDefault() }
+        return TimeZone.getTimeZone(cur)
+    }
 
     // ---- day (never moves backwards, so changing the phone clock can't reset usage) ----
     fun today(c: Context): String {
-        val w = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(nowMs(c)))
+        val w = SimpleDateFormat("yyyy-MM-dd", Locale.US).apply { timeZone = zone(c) }.format(Date(nowMs(c)))
         val m = sp(c).getString("maxDay", "")!!
         if (w <= m) return m
         val e = sp(c).edit().putString("maxDay", w)
@@ -62,8 +73,22 @@ object Prefs {
     fun setConsent(c: Context) = sp(c).edit().putBoolean("consent", true).apply()
     fun pauseOn(c: Context) = sp(c).getBoolean("pause", true)
     fun setPause(c: Context, v: Boolean) = sp(c).edit().putBoolean("pause", v).apply()
+    fun isInstalled(c: Context, p: String) = try { c.packageManager.getApplicationInfo(p, 0); true } catch (e: Exception) { false }
+    private fun defaultApps(c: Context): Set<String> = if (isInstalled(c, INSTAGRAM)) setOf(INSTAGRAM) else emptySet()
+    fun initApps(c: Context) { if (!sp(c).contains("apps")) setApps(c, defaultApps(c)) }
     fun apps(c: Context): Set<String> =
-        if (sp(c).contains("apps")) sp(c).getStringSet("apps", emptySet())!! else setOf(INSTAGRAM)
+        if (sp(c).contains("apps")) sp(c).getStringSet("apps", emptySet())!! else defaultApps(c)
+    /** limited apps that are actually installed on this phone (what the screens should show) */
+    fun installedApps(c: Context): Set<String> = apps(c).filter { isInstalled(c, it) }.toSet()
+    fun lockOn(c: Context) = sp(c).getBoolean("lock", true)
+    fun setLock(c: Context, v: Boolean) = sp(c).edit().putBoolean("lock", v).apply()
+    fun muted(c: Context) = sp(c).getBoolean("muted", false)
+    fun restoreVolume(c: Context) {
+        if (!muted(c)) return
+        try { (c.getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager).adjustStreamVolume(android.media.AudioManager.STREAM_MUSIC, android.media.AudioManager.ADJUST_UNMUTE, 0) } catch (e: Exception) { }
+        setMuted(c, false)
+    }
+    fun setMuted(c: Context, v: Boolean) = sp(c).edit().putBoolean("muted", v).apply()
     fun setApps(c: Context, s: Set<String>) = sp(c).edit().putStringSet("apps", HashSet(s)).apply()
 
     // ---- limits (+ gradual reduction, 1 min/week down to 5) ----

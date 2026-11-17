@@ -3,13 +3,18 @@ package app.pausely
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.Intent
+import android.app.KeyguardManager
 import android.view.View
 import android.widget.*
 
-class SettingsActivity : Activity() {
+class SettingsActivity : SecureActivity() {
     override fun onResume() { super.onResume(); render() }
     private fun render() {
         val c = screen(s(R.string.settings))
+        val secure = (getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isDeviceSecure
+        c.addView(card(sw(s(R.string.lock_title), Prefs.lockOn(this)) { on ->
+            if (on) { Prefs.setLock(this, true); render() } else { render(); puzzle { Prefs.setLock(this, false); render() } } },
+            tv(s(if (secure) R.string.lock_desc else R.string.lock_none)).apply { setPadding(0, dp(6), 0, 0) }))
         c.addView(card(tv(s(R.string.default_title), 16f, C.TEXT, true),
             tv(s(R.string.default_desc, Prefs.defaultEffective(this))).apply { setPadding(0, dp(6), 0, 0) },
             btn(s(R.string.change_default), false) { changeDefaultLimit { render() } }))
@@ -44,6 +49,7 @@ class SettingsActivity : Activity() {
     private fun open(i: Intent) { try { startActivity(i) } catch (e: Exception) { Toast.makeText(this, s(R.string.no_app), Toast.LENGTH_SHORT).show() } }
 
     @Deprecated("") override fun onActivityResult(req: Int, res: Int, data: Intent?) {
+        super.onActivityResult(req, res, data)
         val u = data?.data ?: return
         if (res != RESULT_OK) return
         try {

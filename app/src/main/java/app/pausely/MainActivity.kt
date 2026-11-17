@@ -10,13 +10,14 @@ import android.view.Gravity
 import android.view.View
 import android.widget.*
 
-class MainActivity : Activity() {
-    override fun onResume() { super.onResume(); render() }
+class MainActivity : SecureActivity() {
+    override fun onResume() { super.onResume(); Prefs.restoreVolume(this); render() }
 
     private fun serviceOn() = (Settings.Secure.getString(contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES) ?: "").contains("$packageName/")
 
     private fun render() {
         if (!Prefs.consent(this)) { consent(); return }
+        Prefs.initApps(this)
         val c = screen(s(R.string.app_name), s(R.string.tagline))
         val on = serviceOn()
         if (!on) c.addView(LinearLayout(this).apply {   // loud in-app warning while protection is off
@@ -25,7 +26,7 @@ class MainActivity : Activity() {
             addView(tv(s(R.string.banner_off_title), 16f, C.RED, true)); addView(tv(s(R.string.banner_off_text), 13f, C.TEXT))
             setOnClickListener { startActivity(Intent(this@MainActivity, GuideActivity::class.java)) }
         })
-        val apps = Prefs.apps(this).toList()
+        val apps = Prefs.installedApps(this).toList()
         val used = apps.sumOf { Prefs.usedMs(this, it) }; val lim = apps.sumOf { Prefs.limitMs(this, it) }
         c.addView(Ring(this).apply {
             frac = if (lim > 0) used.toFloat() / lim else 0f; center = s(R.string.minutes_short, (used / 60000).toInt()); sub = s(R.string.used_of, (lim / 60000).toInt())

@@ -12,6 +12,8 @@ Android app that limits time in apps like Instagram and X. Native Kotlin, no dep
 - Emergency unlock: once a day, +5 min, puzzle plus 30 s wait
 - Quick panel from Android's floating accessibility button: usage, -5 min, toggles
 - 30-day stats plus a log of the last 20 counted sessions (why each ended), settings export/import, in-app setup guide
+- Lock: Pausely asks for your phone PIN/pattern/password when opened (Android's own screen, no permission)
+- Foreground re-check on scroll/tap, media muted while the block/pause screen is up, only installed apps shown
 - Searchable app picker with icons and a Suggested group
 - Redesigned quick panel (progress per app, -5 min with undo, toggles)
 - Loud in-app banner when protection (the accessibility service) is switched off

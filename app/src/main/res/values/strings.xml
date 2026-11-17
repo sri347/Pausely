@@ -214,4 +214,9 @@
     <string name="puzzle_why">A quick puzzle before you loosen a limit, so a weak moment can\'t undo it.</string>
     <string name="added_n">Added %1$d apps with the default limit of %2$d min. Tap a card to customise.</string>
     <string name="used_of">of %1$dm today</string>
+    <string name="auth_title">Unlock Pausely</string>
+    <string name="auth_desc">Enter your phone password to open Pausely.</string>
+    <string name="lock_title">Lock Pausely with your phone password</string>
+    <string name="lock_desc">Asks for your PIN, pattern or password when you open Pausely or come back after a minute away.</string>
+    <string name="lock_none">No screen lock is set on this phone, so this has no effect. Set one in Android settings.</string>
 </resources>

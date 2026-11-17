@@ -41,3 +41,9 @@
 40. Picker: rotate the phone mid-selection: ticks and search text survive; the keyboard's search key hides the keyboard; adding shows a toast with the default limit.
 41. Home: ring subtitle says "of Xm today"; app cards have a "›" hint and open the options menu.
 42. Any puzzle shows a one-line reason under the title.
+43. Open Pausely: Android asks for your phone password first (also after 1+ minute away). Settings has a switch for it; turning it off needs a puzzle. With no screen lock set, nothing is asked.
+44. Block an app (limit 1 min). Partially swipe up to peek at recents and return to the app, then scroll or tap: the block screen must come back immediately.
+45. While a reel/video plays, hit the limit: sound stops (media is muted behind the block screen) and returns when you leave the block screen.
+46. On a phone without Instagram: home shows no "com.instagram.android" card, and Stats/Schedules list only installed apps.
+47. Quick panel: tap -5 min, then lower the limit inside Pausely, then tap Undo within 10 s: Undo must NOT raise the limit back.
+48. Change the phone time zone: today's usage and schedules do not change for 24 hours.
