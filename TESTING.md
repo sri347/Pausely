@@ -47,3 +47,7 @@
 46. On a phone without Instagram: home shows no "com.instagram.android" card, and Stats/Schedules list only installed apps.
 47. Quick panel: tap -5 min, then lower the limit inside Pausely, then tap Undo within 10 s: Undo must NOT raise the limit back.
 48. Change the phone time zone: today's usage and schedules do not change for 24 hours.
+49. Block an app, then partially swipe up and return WITHOUT touching: the block screen stays or comes straight back (verified on an Android 15 emulator with Maps).
+50. Press Home with the block screen up: it disappears and the launcher is usable. Tap "take me home": no flicker.
+51. Start Pausely's service (or reboot) while a limited app is already on screen: the pause/block screen appears within about a second.
+52. Block screen and pause screen cover the status bar too (no strip of the app visible).

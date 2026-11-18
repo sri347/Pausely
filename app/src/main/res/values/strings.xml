@@ -1,6 +1,6 @@
 <resources>
     <string name="app_name">Pausely</string>
-    <string name="service_desc">Detects which app is open so Pausely can show its pause and limit screens. It does not read screen content and nothing leaves your phone.</string>
+    <string name="service_desc">Checks which apps are really on screen (package names only) so Pausely can show its pause and limit screens. It never reads text, messages or passwords, and nothing leaves your phone.</string>
     <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>
@@ -47,7 +47,11 @@
     <string name="no_apps">No apps yet. Tap + Add app.</string>
     <string name="consent_title">Before you start</string>
     <string name="consent_head">How Pausely works</string>
-    <string name="consent_body">• Uses Android\'s Accessibility service only to detect which app is open and to show its pause and block screens.\n• Does not read what is on your screen, your messages or passwords.\n• Nothing leaves your phone. The app has no internet permission.\n• You can turn it off any time in Settings → Accessibility.</string>
+    <string name="consent_body">• Uses Android\'s Accessibility service to see which apps are on screen (only their package names) and to show Pausely\'s pause and block screens.
+• Never reads what is written on your screen, your messages or passwords.
+• Nothing leaves your phone. The app has no internet permission.
+• Android will describe this permission as \"retrieve window content\"; Pausely only uses it to know which app is open.
+• You can turn it off any time in Settings → Accessibility.</string>
     <string name="consent_yes">I understand and agree</string>
     <string name="consent_no">No thanks</string>
     <string name="opt_change">Change limit</string>
@@ -87,7 +91,7 @@
     <string name="import_">Import settings</string>
     <string name="guide">Setup guide</string>
     <string name="privacy">Privacy</string>
-    <string name="privacy_body">Pausely runs entirely on your phone. It has no internet permission and sends nothing anywhere.\n\nIt uses the Accessibility service only to learn which app is in the foreground, so it can time your use and show pause/block screens. It does not read screen content, messages or passwords.\n\nIt requests no permissions at all.\n\nStored locally: your app list, limits, schedules, 30 days of per-app usage minutes and open counts, and a log of your last 20 counted sessions. Uninstalling removes it.\n\nQuestions: srikrishna.ayyanki@gmail.com</string>
+    <string name="privacy_body">Pausely runs entirely on your phone. It has no internet permission and sends nothing anywhere.\n\nIt uses the Accessibility service only to learn which apps are on screen (package names), so it can time your use and show pause/block screens. Android words this as "retrieve window content", but Pausely never reads text, messages or passwords.\n\nIt requests no permissions at all.\n\nStored locally: your app list, limits, schedules, 30 days of per-app usage minutes and open counts, and a log of your last 20 counted sessions. Uninstalling removes it.\n\nQuestions: srikrishna.ayyanki@gmail.com</string>
     <string name="about_title">About the developer</string>
     <string name="about_body">Built by Sri Krishna Ayyanki\nsrikrishna.ayyanki@gmail.com</string>
     <string name="linkedin">LinkedIn</string>

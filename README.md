@@ -20,7 +20,7 @@ Android app that limits time in apps like Instagram and X. Native Kotlin, no dep
 - Screen-reader labels, all text in string resources, 12/24-hour aware times
 
 ## How it works
-An Accessibility service detects the foreground app (`TYPE_WINDOW_STATE_CHANGED` only; it cannot read screen content) and shows overlays. Usage is timed with a single timer per session, with no polling. Everything stays on the device; the app has no internet permission. See [PRIVACY.md](PRIVACY.md).
+An Accessibility service asks Android which application windows are on screen (package names only, via the window list) and shows overlays. This is more reliable than waiting for events: a partial minimise, split screen, pop-up or picture-in-picture window can no longer hide a limited app from Pausely. Android describes the capability as "retrieve window content"; Pausely never reads text, messages or passwords. Usage is timed with a single timer per session plus a light 2-second check while a limited app is on screen. Everything stays on the device; the app has no internet permission. See [PRIVACY.md](PRIVACY.md).
 
 ## Install (sideload)
 1. Install `Pausely-<version>.apk`. If Play Protect blocks it, temporarily pause "Scan apps" in Play Protect settings.

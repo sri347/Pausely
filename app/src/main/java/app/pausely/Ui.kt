@@ -59,7 +59,7 @@ fun Activity.screen(title: String, sub: String? = null): LinearLayout {
     val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(24), dp(20), dp(32)); fitSystem(dp(20), dp(24)) }
     col.addView(tv(title, 28f, C.TEXT, true)); if (sub != null) col.addView(tv(sub))
     val oldY = (findViewById<android.view.ViewGroup>(android.R.id.content)?.getChildAt(0) as? ScrollView)?.scrollY ?: 0
-    val sv = ScrollView(this).apply { setBackgroundColor(C.BG); isFillViewport = true; addView(col) }
+    val sv = ScrollView(this).apply { setBackgroundColor(C.BG); isFillViewport = true; defaultFocusHighlightEnabled = false; addView(col) }   // no grey focus veil for hardware-keyboard users
     setContentView(sv); if (oldY > 0) sv.post { sv.scrollTo(0, oldY) }
     return col
 }

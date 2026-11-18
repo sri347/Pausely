@@ -4,6 +4,8 @@ import android.accessibilityservice.AccessibilityButtonController
 import android.accessibilityservice.AccessibilityService
 import android.app.KeyguardManager
 import android.content.*
+import android.content.pm.ApplicationInfo
+import android.util.Log
 import android.graphics.PixelFormat
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
@@ -13,6 +15,7 @@ import android.os.*
 import android.provider.Settings
 import android.view.*
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.*
 
 class LimiterService : AccessibilityService() {
@@ -32,6 +35,8 @@ class LimiterService : AccessibilityService() {
     private fun markExit(p: String) { if (p in Prefs.apps(this)) Prefs.markExit(this, p) }
     private val IGNORED = setOf("com.android.systemui", "android", "com.google.android.permissioncontroller",
         "com.android.permissioncontroller", "com.android.intentresolver")
+    private val debuggable by lazy { (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0 }
+    private fun dbg(m: String) { if (debuggable) Log.d("PauselyDbg", m) }
     private val GRACE = 2 * 60_000L     // re-entering within 2 min is the same "sitting"
 
     private val tick = Runnable { commit("limit"); enter(pkg, true) }
@@ -40,17 +45,17 @@ class LimiterService : AccessibilityService() {
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(c: Context, i: Intent) {
             if (i.action == Intent.ACTION_SCREEN_OFF) {
-                val was = startedAt != 0L; commit("screen"); h.removeCallbacks(tick); if (was) pkg?.let { markExit(it) }
+                val was = startedAt != 0L; commit("screen"); h.removeCallbacks(tick); h.removeCallbacks(watchRun); if (was) pkg?.let { markExit(it) }
             } else if (!(getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked) resume()
         }
     }
 
-    private fun resume() { if (startedAt == 0L && overlay == null) pkg?.let { if (it in Prefs.apps(this)) enter(it) } }
+    private fun resume() { scheduleReconcile(300) }
 
     override fun onServiceConnected() {
         if (registered) return
         registered = true
-        Prefs.recoverRec(this); unmuteMedia()
+        Prefs.recoverRec(this); unmuteMedia(); scheduleReconcile(500)   // we may be started while a limited app is already on screen
         accessibilityButtonController.registerAccessibilityButtonCallback(object : AccessibilityButtonController.AccessibilityButtonCallback() {
             override fun onClicked(controller: AccessibilityButtonController) { showPanel() }
         })
@@ -59,23 +64,72 @@ class LimiterService : AccessibilityService() {
         }, if (Build.VERSION.SDK_INT >= 33) RECEIVER_NOT_EXPORTED else 0)
     }
 
+    // ---------- what is really on screen ----------
+    private val reconcileRun = Runnable { reconcile() }
+    private fun scheduleReconcile(delay: Long = 150) { h.removeCallbacks(reconcileRun); h.postDelayed(reconcileRun, delay) }
+    private var hintPkg: String? = null
+    private var suppressUntil = 0L      // right after "take me home": let Android finish the transition before judging
+    private var watchUntil = 0L
+    private val watchRun = object : Runnable { override fun run() { reconcile(); ensureWatch() } }
+    private fun needWatch() = (pkg != null && pkg in Prefs.apps(this)) || SystemClock.elapsedRealtime() < watchUntil
+    private fun ensureWatch() { h.removeCallbacks(watchRun); if (needWatch()) h.postDelayed(watchRun, 2000) }  // safety net: events can be missed
+    private var protAt = 0L
+    private var protSet: Set<String> = emptySet()
+    private fun protectedNow(): Set<String> {
+        val now = SystemClock.elapsedRealtime()
+        if (now - protAt > 60_000L || protSet.isEmpty()) { protSet = Prefs.protectedPkgs(this); protAt = now }
+        return protSet
+    }
+
+    /** Packages of the application windows currently on screen: (active one, all of them). Null if Android refuses. */
+    private fun visibleApps(): Pair<String?, List<String>>? {
+        val ws = try { windows } catch (e: Exception) { null } ?: return null
+        var active: String? = null; val all = ArrayList<String>()
+        for (w in ws) {
+            try {
+                if (w.type != AccessibilityWindowInfo.TYPE_APPLICATION) continue
+                val root = w.root ?: continue
+                val name = root.packageName?.toString()
+                try { root.recycle() } catch (_: Exception) { }
+                if (name == null) continue
+                if (name !in all) all.add(name)
+                if (w.isActive) active = name
+            } catch (_: Exception) { } finally { try { w.recycle() } catch (_: Exception) { } }
+        }
+        return active to all
+    }
+
+    private fun reconcile() {
+        if (!Prefs.consent(this)) return          // never look at windows before the user agreed
+        val sNow = SystemClock.elapsedRealtime()
+        if (sNow < suppressUntil) { h.removeCallbacks(reconcileRun); h.postDelayed(reconcileRun, suppressUntil - sNow + 50); return }
+        if (!(getSystemService(POWER_SERVICE) as PowerManager).isInteractive) return
+        if ((getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked) return
+        val apps = Prefs.apps(this); val prot = protectedNow()
+        val v = visibleApps()
+        val target: String? = if (v == null || (v.first == null && v.second.isEmpty())) hintPkg else {
+            val active = v.first
+            // a limited app visible ANYWHERE (split screen, pop-up, picture-in-picture, behind a dialog) wins over the active window
+            if (active != null && active in apps && active !in prot) active
+            else v.second.firstOrNull { it in apps && it !in prot } ?: active ?: v.second.firstOrNull()
+        }
+        dbg("reconcile active=${v?.first} all=${v?.second} hint=$hintPkg -> target=$target | state pkg=$pkg counting=${startedAt != 0L} overlay=$ovKind")
+        if (target == null) return
+        if (target == packageName && panel != null) return
+        if (target == pkg && (startedAt != 0L || overlay != null)) return     // nothing changed
+        enter(target)
+    }
+
     override fun onAccessibilityEvent(e: AccessibilityEvent) {
         val type = e.eventType
-        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && type != AccessibilityEvent.TYPE_VIEW_SCROLLED && type != AccessibilityEvent.TYPE_VIEW_CLICKED) return
-        val p = e.packageName?.toString() ?: return
-        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            // someone is scrolling/tapping inside a limited app. If we think it is not on screen (you peeked at recents and came back),
-            // or it is on screen but neither counting nor blocked, re-evaluate right now.
-            if (p == packageName || p !in Prefs.apps(this)) return
-            if (p == pkg && (startedAt != 0L || overlay != null || panel != null)) return
-            enter(p); return
+        if (type != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED && type != AccessibilityEvent.TYPE_WINDOWS_CHANGED) return
+        if (debuggable) dbg("event ${AccessibilityEvent.eventTypeToString(type)} pkg=${e.packageName} cls=${e.className}")
+        if (type == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val p = e.packageName?.toString()
+            val ime = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)?.substringBefore('/')
+            if (p != null && p !in IGNORED && p != ime && !(p == packageName && (overlay != null || panel != null))) hintPkg = p   // only used if the window list is unavailable
         }
-        // transient system windows (dialogs, share sheet, keyboard) must not look like "left the app"
-        val ime = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)?.substringBefore('/')
-        if (p in IGNORED || p == ime) return
-        if (p == packageName && (overlay != null || panel != null)) return // event from our own overlay/panel
-        if (p == pkg && (startedAt != 0L || overlay != null)) return
-        enter(p)
+        scheduleReconcile()
     }
 
     private fun commit(reason: String = "left") {
@@ -89,6 +143,12 @@ class LimiterService : AccessibilityService() {
     }
 
     private fun enter(p: String?, continuing: Boolean = false) {
+        if (overlay != null && (p == null || p !in Prefs.apps(this))) watchUntil = SystemClock.elapsedRealtime() + 20_000L  // user may only be peeking
+        enterInner(p, continuing); ensureWatch()
+    }
+
+    private fun enterInner(p: String?, continuing: Boolean) {
+        dbg("enter($p, continuing=$continuing)")
         val wasCounting = startedAt != 0L
         commit(if (continuing) "recheck" else "left"); h.removeCallbacks(tick); h.removeCallbacks(recheck)
         val prev = pkg
@@ -186,19 +246,29 @@ class LimiterService : AccessibilityService() {
         layoutParams = LinearLayout.LayoutParams(-1, dp(52)).apply { topMargin = dp(16) }
     }
 
+    /** Full-screen window that also covers the status bar and the camera cut-out, so nothing of the app underneath peeks out. */
+    private fun overlayParams(translucent: Boolean): WindowManager.LayoutParams {
+        val lp = WindowManager.LayoutParams(-1, -1, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+            if (translucent) PixelFormat.TRANSLUCENT else PixelFormat.OPAQUE)
+        if (Build.VERSION.SDK_INT >= 30) lp.fitInsetsTypes = 0
+        if (Build.VERSION.SDK_INT >= 28) lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+        return lp
+    }
+
     private fun addOverlay(content: View, kind: String, until: Int? = null) {
+        dbg("SHOW overlay $kind")
         val v = object : FrameLayout(this) {
             override fun dispatchKeyEvent(ev: KeyEvent): Boolean {
                 if (ev.keyCode == KeyEvent.KEYCODE_BACK) { if (ev.action == KeyEvent.ACTION_UP) goHome(); return true }
                 return super.dispatchKeyEvent(ev)
             }
         }.apply { pane(s(if (kind == "block") R.string.pane_block else R.string.pane_nudge)); setBackgroundColor(C.BG); addView(ScrollView(this@LimiterService).apply { isFillViewport = true; addView(content) }) }
-        val lp = WindowManager.LayoutParams(-1, -1, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, PixelFormat.OPAQUE)
-        (getSystemService(WINDOW_SERVICE) as WindowManager).addView(v, lp); overlay = v; ovKind = kind; ovUntil = until
+        (getSystemService(WINDOW_SERVICE) as WindowManager).addView(v, overlayParams(false)); overlay = v; ovKind = kind; ovUntil = until
     }
 
     private fun hideOverlay() {
+        if (overlay != null) dbg("HIDE overlay $ovKind")
         overlay?.let { try { (getSystemService(WINDOW_SERVICE) as WindowManager).removeView(it) } catch (_: Exception) {} }
         overlay = null; ovKind = null; ovUntil = null; releaseAudio(); unmuteMedia()
     }
@@ -298,14 +368,12 @@ class LimiterService : AccessibilityService() {
             layoutParams = LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(12) }; setOnClickListener { openApp(MainActivity::class.java) }
         })
         val sheet = ScrollView(this).apply { background = roundBg(C.BG, dp(28).toFloat()); isClickable = true; addView(col) }
-        scrim.addView(sheet, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { setMargins(dp(8), dp(8), dp(8), dp(8)) })
-        val lp = WindowManager.LayoutParams(-1, -1, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
-            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN, PixelFormat.TRANSLUCENT)
-        (getSystemService(WINDOW_SERVICE) as WindowManager).addView(scrim, lp); panel = scrim
+        scrim.addView(sheet, FrameLayout.LayoutParams(-1, -2, Gravity.BOTTOM).apply { setMargins(dp(8), dp(8), dp(8), dp(28)) })
+        (getSystemService(WINDOW_SERVICE) as WindowManager).addView(scrim, overlayParams(true)); panel = scrim
     }
 
     // only ever triggered by the user tapping a button / pressing Back
-    private fun goHome() { performGlobalAction(GLOBAL_ACTION_HOME); hideOverlay() }
+    private fun goHome() { suppressUntil = SystemClock.elapsedRealtime() + 1200L; performGlobalAction(GLOBAL_ACTION_HOME); hideOverlay(); scheduleReconcile(1300) }
 
     override fun onInterrupt() { commit("stopped"); h.removeCallbacks(tick) }
     override fun onDestroy() {

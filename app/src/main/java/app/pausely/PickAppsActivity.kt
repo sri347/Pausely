@@ -83,7 +83,7 @@ class PickAppsActivity : SecureActivity() {
             }
         }
         val list = ListView(this).apply {
-            adapter = this@PickAppsActivity.adapter; divider = null; dividerHeight = 0; selector = android.graphics.drawable.ColorDrawable(0)
+            adapter = this@PickAppsActivity.adapter; defaultFocusHighlightEnabled = false; divider = null; dividerHeight = 0; selector = android.graphics.drawable.ColorDrawable(0)
             setOnItemClickListener { _, _, pos, _ ->
                 val pk = rows[pos].pkg ?: return@setOnItemClickListener
                 if (!chosen.add(pk)) chosen.remove(pk)
